@@ -1,9 +1,7 @@
 # Rustris
 
-![Rust](https://img.shields.io/badge/Rust-2024_edition-orange?logo=rust&logoColor=white)
-![crossterm](https://img.shields.io/badge/crossterm-0.28-blue)
-![rand](https://img.shields.io/badge/rand-0.8-blue)
-![License](https://img.shields.io/badge/license-GPL--3.0-green)
+[![Rust](https://img.shields.io/badge/Rust-2024_edition-orange?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![License](https://img.shields.io/badge/license-GPL--3.0-green?style=for-the-badge)](./LICENSE)
 
 A terminal-based Tetris game written in Rust, following the [Tetris Guideline](https://tetris.wiki/Tetris_Guideline).
 
