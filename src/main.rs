@@ -71,6 +71,24 @@ fn run_game(stdout: &mut io::Stdout) -> io::Result<()> {
         if event::poll(timeout)? {
             if let Event::Key(KeyEvent { code, .. }) = event::read()? {
                 match code {
+                    KeyCode::Esc => {
+                        render::draw_pause(stdout)?;
+                        loop {
+                            if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+                                match code {
+                                    KeyCode::Esc => break,
+                                    KeyCode::Char('q') | KeyCode::Char('Q') => return Ok(()),
+                                    _ => {}
+                                }
+                            }
+                        }
+                        // Reset timers so the game doesn't jump forward
+                        last_tick = Instant::now();
+                        if game.lock_delay.is_some() {
+                            game.lock_delay = Some(Instant::now());
+                        }
+                        continue;
+                    }
                     KeyCode::Left => {
                         game.move_piece(0, -1);
                     }

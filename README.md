@@ -18,16 +18,17 @@ A terminal-based Tetris game written in Rust, following the [Tetris Guideline](h
 
 ## Controls
 
-| Key | Action |
-|---|---|
-| Left / Right | Move piece |
-| Down | Soft drop (+1 per cell) |
-| Space | Hard drop (+2 per cell) |
-| Up / X | Rotate clockwise |
-| Z | Rotate counter-clockwise |
-| C | Hold piece |
-| R | Restart (on game over) |
-| Q | Quit |
+| Key          | Action                   |
+| ------------ | ------------------------ |
+| Left / Right | Move piece               |
+| Down         | Soft drop (+1 per cell)  |
+| Space        | Hard drop (+2 per cell)  |
+| Up / X       | Rotate clockwise         |
+| Z            | Rotate counter-clockwise |
+| C            | Hold piece               |
+| Esc          | Pause / Resume           |
+| R            | Restart (on game over)   |
+| Q            | Quit                     |
 
 ## Build & Run
 

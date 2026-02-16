@@ -190,3 +190,33 @@ pub fn draw_game_over(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
     stdout.flush()?;
     Ok(())
 }
+
+pub fn draw_pause(stdout: &mut io::Stdout) -> io::Result<()> {
+    let x = LEFT_W as u16;
+    let y = BOARD_HEIGHT as u16 / 2 - 2;
+
+    let inner_w = BOARD_WIDTH * 2;
+    let border = "═".repeat(inner_w);
+    let border_line = format!("╠{}╣", border);
+    let empty_line = format!("║{:^width$}║", "", width = inner_w);
+    let title_line = format!("║{:^width$}║", "PAUSED", width = inner_w);
+    let hint_line = format!("║{:^width$}║", "[Esc] Resume", width = inner_w);
+
+    let rows: Vec<String> = vec![
+        border_line.clone(),
+        empty_line.clone(),
+        title_line,
+        empty_line.clone(),
+        hint_line,
+        empty_line.clone(),
+        border_line,
+    ];
+
+    for (i, row) in rows.iter().enumerate() {
+        execute!(stdout, cursor::MoveTo(x, y + i as u16))?;
+        write!(stdout, "{}", row.as_str().with(Color::White))?;
+    }
+
+    stdout.flush()?;
+    Ok(())
+}
