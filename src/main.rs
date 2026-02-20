@@ -9,7 +9,7 @@ use crossterm::{
     terminal,
 };
 use std::io;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use game::{Game, LOCK_DELAY};
 
@@ -58,6 +58,26 @@ fn run_game(stdout: &mut io::Stdout) -> io::Result<()> {
         }
 
         render::draw(stdout, &game)?;
+
+        // Handle line clear animation
+        if game.is_animating() {
+            if game.update_animation() {
+                // Animation still running: short poll, only respond to quit
+                if event::poll(Duration::from_millis(16))? {
+                    if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+                        if matches!(code, KeyCode::Char('q') | KeyCode::Char('Q')) {
+                            return Ok(());
+                        }
+                    }
+                }
+                continue;
+            } else {
+                // Animation finished
+                game.finish_clear();
+                last_tick = Instant::now();
+                continue;
+            }
+        }
 
         // Poll timeout: min of gravity interval and lock delay remaining
         let gravity_remaining = game.drop_interval().saturating_sub(last_tick.elapsed());
@@ -121,7 +141,7 @@ fn run_game(stdout: &mut io::Stdout) -> io::Result<()> {
         if let Some(lock_start) = game.lock_delay {
             if lock_start.elapsed() >= LOCK_DELAY {
                 game.lock_delay = None;
-                game.lock_and_advance();
+                game.lock_and_begin_clear();
                 last_tick = Instant::now();
                 continue;
             }

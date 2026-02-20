@@ -3,6 +3,23 @@ use std::time::{Duration, Instant};
 use crate::piece::*;
 
 pub const LOCK_DELAY: Duration = Duration::from_millis(500);
+pub const LINE_CLEAR_ANIM_DURATION: Duration = Duration::from_millis(300);
+
+pub struct LineClearAnimation {
+    pub rows: Vec<usize>,
+    pub started_at: Instant,
+    pub phase: u8,
+}
+
+impl LineClearAnimation {
+    pub fn new(rows: Vec<usize>) -> Self {
+        Self {
+            rows,
+            started_at: Instant::now(),
+            phase: 0,
+        }
+    }
+}
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum LastMove {
@@ -34,6 +51,7 @@ pub struct Game {
     pub last_action: Option<ClearAction>,
     pub last_action_time: Instant,
     pub lock_delay: Option<Instant>,
+    pub line_clear_anim: Option<LineClearAnimation>,
 }
 
 impl Game {
@@ -61,6 +79,7 @@ impl Game {
             last_action: None,
             last_action_time: Instant::now(),
             lock_delay: None,
+            line_clear_anim: None,
         }
     }
 
@@ -133,21 +152,27 @@ impl Game {
         }
     }
 
-    fn clear_lines(&mut self) -> u32 {
-        let mut cleared = 0u32;
-        let mut new_board = [[EMPTY; BOARD_WIDTH]; BOARD_HEIGHT];
-        let mut dest = BOARD_HEIGHT - 1;
-
-        for src in (0..BOARD_HEIGHT).rev() {
-            if self.board[src].iter().all(|&c| c != EMPTY) {
-                cleared += 1;
-            } else {
-                new_board[dest] = self.board[src];
-                dest = dest.wrapping_sub(1);
+    fn find_full_rows(&self) -> Vec<usize> {
+        let mut rows = Vec::new();
+        for r in 0..BOARD_HEIGHT {
+            if self.board[r].iter().all(|&c| c != EMPTY) {
+                rows.push(r);
             }
         }
+        rows
+    }
+
+    fn remove_rows(&mut self, rows: &[usize]) {
+        let mut new_board = [[EMPTY; BOARD_WIDTH]; BOARD_HEIGHT];
+        let mut dest = BOARD_HEIGHT - 1;
+        for src in (0..BOARD_HEIGHT).rev() {
+            if rows.contains(&src) {
+                continue;
+            }
+            new_board[dest] = self.board[src];
+            dest = dest.wrapping_sub(1);
+        }
         self.board = new_board;
-        cleared
     }
 
     fn spawn_next(&mut self) {
@@ -265,7 +290,7 @@ impl Game {
         let points = cells_dropped * 2;
         self.score += points;
         self.lock_delay = None;
-        self.lock_and_advance();
+        self.lock_and_begin_clear();
         points
     }
 
@@ -286,11 +311,12 @@ impl Game {
         }
     }
 
-    pub fn lock_and_advance(&mut self) {
+    pub fn lock_and_begin_clear(&mut self) -> bool {
         let (is_tspin, is_mini) = self.detect_tspin();
 
         self.lock_current();
-        let cleared = self.clear_lines();
+        let full_rows = self.find_full_rows();
+        let cleared = full_rows.len() as u32;
 
         if cleared > 0 {
             self.lines += cleared;
@@ -342,8 +368,20 @@ impl Game {
             let total = line_points + combo_points;
             self.score += total;
 
-            // All Clear (Perfect Clear)
-            let is_all_clear = self.board.iter().all(|row| row.iter().all(|&c| c == EMPTY));
+            // All Clear check uses a temporary board with cleared rows removed
+            let mut temp_board = self.board;
+            let mut new_board = [[EMPTY; BOARD_WIDTH]; BOARD_HEIGHT];
+            let mut dest = BOARD_HEIGHT - 1;
+            for src in (0..BOARD_HEIGHT).rev() {
+                if full_rows.contains(&src) {
+                    continue;
+                }
+                new_board[dest] = temp_board[src];
+                dest = dest.wrapping_sub(1);
+            }
+            temp_board = new_board;
+
+            let is_all_clear = temp_board.iter().all(|row| row.iter().all(|&c| c == EMPTY));
             let pc_bonus = if is_all_clear {
                 let pc_base = match cleared {
                     1 => 800,
@@ -397,6 +435,10 @@ impl Game {
             }
 
             self.level = self.lines / 10 + 1;
+
+            // Start animation instead of clearing immediately
+            self.line_clear_anim = Some(LineClearAnimation::new(full_rows));
+            return true;
         } else {
             self.combo = -1;
 
@@ -418,6 +460,39 @@ impl Game {
         }
 
         self.spawn_next();
+        false
+    }
+
+    pub fn finish_clear(&mut self) {
+        if let Some(anim) = self.line_clear_anim.take() {
+            self.remove_rows(&anim.rows);
+        }
+        self.spawn_next();
+    }
+
+    pub fn update_animation(&mut self) -> bool {
+        if let Some(ref mut anim) = self.line_clear_anim {
+            let elapsed = anim.started_at.elapsed().as_millis() as u64;
+            let total = LINE_CLEAR_ANIM_DURATION.as_millis() as u64;
+            let phase_len = total / 3;
+            let phase = if elapsed < phase_len {
+                0
+            } else if elapsed < phase_len * 2 {
+                1
+            } else if elapsed < total {
+                2
+            } else {
+                return false; // animation finished
+            };
+            anim.phase = phase;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_animating(&self) -> bool {
+        self.line_clear_anim.is_some()
     }
 
     pub fn ghost_row(&self) -> i32 {

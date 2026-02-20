@@ -6,6 +6,7 @@ use crate::game::Game;
 use crate::piece::*;
 
 const LEFT_W: usize = 12;
+const TITLE_HEIGHT: u16 = 7;
 
 fn color_for(id: u8) -> Color {
     PIECE_COLORS[(id - 1) as usize]
@@ -36,6 +37,75 @@ fn draw_piece_preview(
     Ok(())
 }
 
+fn draw_title(stdout: &mut io::Stdout) -> io::Result<()> {
+    const LETTERS: [(Color, [&str; 6]); 6] = [
+        // T
+        (Color::Red, [
+            "  ██████╗",
+            "  ╚═██╔═╝",
+            "    ██║  ",
+            "    ██║  ",
+            "    ██║  ",
+            "    ╚═╝  ",
+        ]),
+        // E
+        (Color::DarkYellow, [
+            "██████╗",
+            "██╔═══╝",
+            "█████╗ ",
+            "██╔══╝ ",
+            "██████╗",
+            "╚═════╝",
+        ]),
+        // T
+        (Color::Yellow, [
+            "██████╗",
+            "╚═██╔═╝",
+            "  ██║  ",
+            "  ██║  ",
+            "  ██║  ",
+            "  ╚═╝  ",
+        ]),
+        // R
+        (Color::Green, [
+            "█████╗ ",
+            "██╔═██╗",
+            "█████╔╝",
+            "██╔═██╗",
+            "██║ ██║",
+            "╚═╝ ╚═╝",
+        ]),
+        // I
+        (Color::Blue, [
+            "██╗",
+            "██║",
+            "██║",
+            "██║",
+            "██║",
+            "╚═╝",
+        ]),
+        // S
+        (Color::Magenta, [
+            " █████╗",
+            "██╔═══╝",
+            "╚████╗ ",
+            " ╚══██╗",
+            "█████╔╝",
+            "╚════╝ ",
+        ]),
+    ];
+
+    for row in 0..6 {
+        write!(stdout, "  ")?;
+        for (color, letter) in &LETTERS {
+            write!(stdout, "{}", letter[row].with(*color))?;
+        }
+        write!(stdout, "\x1b[K\r\n")?;
+    }
+    write!(stdout, "\r\n")?;
+    Ok(())
+}
+
 fn left_panel_pad(stdout: &mut io::Stdout, visual_len: usize) -> io::Result<()> {
     if visual_len < LEFT_W {
         write!(stdout, "{:width$}", "", width = LEFT_W - visual_len)?;
@@ -45,15 +115,38 @@ fn left_panel_pad(stdout: &mut io::Stdout, visual_len: usize) -> io::Result<()> 
 
 pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
     execute!(stdout, cursor::MoveTo(0, 0))?;
+    draw_title(stdout)?;
 
-    let ghost_row = game.ghost_row();
-    let ghost_cells: [(i32, i32); 4] = {
-        let mut g = game.current.clone();
-        g.row = ghost_row;
-        g.cells()
-    };
-    let current_cells = game.current.cells();
-    let current_color = PIECE_COLORS[game.current.kind];
+    let animating = game.is_animating();
+    let anim_rows: Vec<usize> = game
+        .line_clear_anim
+        .as_ref()
+        .map(|a| a.rows.clone())
+        .unwrap_or_default();
+    let anim_phase = game
+        .line_clear_anim
+        .as_ref()
+        .map(|a| a.phase)
+        .unwrap_or(0);
+
+    // Only compute ghost/current cells if not animating
+    let ghost_cells: [(i32, i32); 4];
+    let current_cells: [(i32, i32); 4];
+    let current_color: Color;
+    if animating {
+        ghost_cells = [(-1, -1); 4];
+        current_cells = [(-1, -1); 4];
+        current_color = Color::White;
+    } else {
+        let ghost_row = game.ghost_row();
+        ghost_cells = {
+            let mut g = game.current.clone();
+            g.row = ghost_row;
+            g.cells()
+        };
+        current_cells = game.current.cells();
+        current_color = PIECE_COLORS[game.current.kind];
+    }
 
     let show_action = game.last_action.is_some()
         && game.last_action_time.elapsed() < Duration::from_secs(3);
@@ -93,10 +186,18 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
         // Board
         write!(stdout, "║")?;
         for col in 0..BOARD_WIDTH {
-            let pos = (row as i32, col as i32);
-            if current_cells.contains(&pos) {
+            if anim_rows.contains(&row) {
+                // Animating row: render based on phase
+                match anim_phase {
+                    0 => write!(stdout, "{}", "██".with(Color::White))?,
+                    1 => write!(stdout, "{}", "▓▓".with(Color::DarkGrey))?,
+                    _ => write!(stdout, "  ")?,
+                }
+            } else if current_cells.contains(&(row as i32, col as i32)) {
                 write!(stdout, "{}", "██".with(current_color))?;
-            } else if ghost_cells.contains(&pos) && game.board[row][col] == EMPTY {
+            } else if ghost_cells.contains(&(row as i32, col as i32))
+                && game.board[row][col] == EMPTY
+            {
                 write!(stdout, "{}", "░░".with(current_color))?;
             } else {
                 let id = game.board[row][col];
@@ -158,7 +259,7 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
 
 pub fn draw_game_over(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
     let x = LEFT_W as u16;
-    let y = BOARD_HEIGHT as u16 / 2 - 4;
+    let y = TITLE_HEIGHT + BOARD_HEIGHT as u16 / 2 - 4;
 
     let inner_w = BOARD_WIDTH * 2;
     let border = "═".repeat(inner_w);
@@ -193,7 +294,7 @@ pub fn draw_game_over(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
 
 pub fn draw_pause(stdout: &mut io::Stdout) -> io::Result<()> {
     let x = LEFT_W as u16;
-    let y = BOARD_HEIGHT as u16 / 2 - 2;
+    let y = TITLE_HEIGHT + BOARD_HEIGHT as u16 / 2 - 2;
 
     let inner_w = BOARD_WIDTH * 2;
     let border = "═".repeat(inner_w);
