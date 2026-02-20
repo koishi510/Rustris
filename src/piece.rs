@@ -5,6 +5,7 @@ pub const BOARD_WIDTH: usize = 10;
 pub const BOARD_HEIGHT: usize = 20;
 pub const EMPTY: u8 = 0;
 pub const NEXT_COUNT: usize = 6;
+pub const KIND_O: usize = 1;
 pub const KIND_T: usize = 2;
 
 // SRS rotation states: 7 pieces x 4 rotations, each cell is [row, col] offset
@@ -131,10 +132,11 @@ pub struct Piece {
 
 impl Piece {
     pub fn new(kind: usize) -> Self {
+        let row = if kind == KIND_O { -1 } else { 0 };
         Self {
             kind,
             rotation: 0,
-            row: 0,
+            row,
             col: (BOARD_WIDTH as i32) / 2 - 1,
         }
     }

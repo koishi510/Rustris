@@ -24,7 +24,15 @@ fn main() -> io::Result<()> {
         terminal::Clear(terminal::ClearType::All)
     )?;
 
-    let result = run_game(&mut stdout);
+    let result = (|| {
+        loop {
+            let level = match select_level(&mut stdout)? {
+                Some(l) => l,
+                None => return Ok(()),
+            };
+            run_game(&mut stdout, level)?;
+        }
+    })();
 
     execute!(stdout, cursor::Show, terminal::LeaveAlternateScreen)?;
     terminal::disable_raw_mode()?;
@@ -32,9 +40,39 @@ fn main() -> io::Result<()> {
     result
 }
 
-fn run_game(stdout: &mut io::Stdout) -> io::Result<()> {
-    let mut game = Game::new();
+fn select_level(stdout: &mut io::Stdout) -> io::Result<Option<u32>> {
+    let mut level: u32 = 1;
+
+    render::draw_empty_board(stdout)?;
+    render::draw_level_select(stdout, level)?;
+
+    loop {
+        if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+            match code {
+                KeyCode::Up => {
+                    if level < 25 {
+                        level += 1;
+                    }
+                }
+                KeyCode::Down => {
+                    if level > 1 {
+                        level -= 1;
+                    }
+                }
+                KeyCode::Enter => return Ok(Some(level)),
+                KeyCode::Char('q') | KeyCode::Char('Q') => return Ok(None),
+                _ => continue,
+            }
+            render::draw_empty_board(stdout)?;
+            render::draw_level_select(stdout, level)?;
+        }
+    }
+}
+
+fn run_game(stdout: &mut io::Stdout, start_level: u32) -> io::Result<()> {
+    let mut game = Game::new(start_level);
     let mut last_tick = Instant::now();
+    execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
 
     loop {
         if game.game_over {
@@ -45,24 +83,18 @@ fn run_game(stdout: &mut io::Stdout) -> io::Result<()> {
                     match code {
                         KeyCode::Char('q') | KeyCode::Char('Q') => return Ok(()),
                         KeyCode::Char('r') | KeyCode::Char('R') => {
-                            game = Game::new();
-                            last_tick = Instant::now();
-                            execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
-                            break;
+                            return Ok(());
                         }
                         _ => {}
                     }
                 }
             }
-            continue;
         }
 
         render::draw(stdout, &game)?;
 
-        // Handle line clear animation
         if game.is_animating() {
             if game.update_animation() {
-                // Animation still running: short poll, only respond to quit
                 if event::poll(Duration::from_millis(16))? {
                     if let Event::Key(KeyEvent { code, .. }) = event::read()? {
                         if matches!(code, KeyCode::Char('q') | KeyCode::Char('Q')) {
@@ -72,14 +104,12 @@ fn run_game(stdout: &mut io::Stdout) -> io::Result<()> {
                 }
                 continue;
             } else {
-                // Animation finished
                 game.finish_clear();
                 last_tick = Instant::now();
                 continue;
             }
         }
 
-        // Poll timeout: min of gravity interval and lock delay remaining
         let gravity_remaining = game.drop_interval().saturating_sub(last_tick.elapsed());
         let timeout = if let Some(lock_start) = game.lock_delay {
             let lock_remaining = LOCK_DELAY.saturating_sub(lock_start.elapsed());
@@ -102,7 +132,7 @@ fn run_game(stdout: &mut io::Stdout) -> io::Result<()> {
                                 }
                             }
                         }
-                        // Reset timers so the game doesn't jump forward
+                        // Reset timers after unpause
                         last_tick = Instant::now();
                         if game.lock_delay.is_some() {
                             game.lock_delay = Some(Instant::now());
@@ -137,7 +167,6 @@ fn run_game(stdout: &mut io::Stdout) -> io::Result<()> {
             }
         }
 
-        // Lock delay expired
         if let Some(lock_start) = game.lock_delay {
             if lock_start.elapsed() >= LOCK_DELAY {
                 game.lock_delay = None;

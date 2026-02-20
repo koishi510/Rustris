@@ -129,7 +129,6 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
         .map(|a| a.phase)
         .unwrap_or(0);
 
-    // Only compute ghost/current cells if not animating
     let ghost_cells: [(i32, i32); 4];
     let current_cells: [(i32, i32); 4];
     let current_color: Color;
@@ -158,7 +157,6 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
     write!(stdout, "╗\x1b[K\r\n")?;
 
     for row in 0..BOARD_HEIGHT {
-        // Left panel (NEXT)
         match row {
             0 => {
                 write!(stdout, "{:<LEFT_W$}", "  NEXT:")?;
@@ -187,7 +185,6 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
         write!(stdout, "║")?;
         for col in 0..BOARD_WIDTH {
             if anim_rows.contains(&row) {
-                // Animating row: render based on phase
                 match anim_phase {
                     0 => write!(stdout, "{}", "██".with(Color::White))?,
                     1 => write!(stdout, "{}", "▓▓".with(Color::DarkGrey))?,
@@ -209,7 +206,7 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
             }
         }
 
-        // Right panel (HOLD + info)
+        // Right panel
         write!(stdout, "║")?;
         match row {
             0 => {
@@ -243,6 +240,36 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
             _ => {}
         }
         write!(stdout, "\x1b[K\r\n")?;
+    }
+
+    write!(stdout, "{:LEFT_W$}╚", "")?;
+    for _ in 0..BOARD_WIDTH {
+        write!(stdout, "══")?;
+    }
+    write!(stdout, "╝\x1b[K\r\n")?;
+
+    write!(stdout, "\x1b[J")?;
+
+    stdout.flush()?;
+    Ok(())
+}
+
+pub fn draw_empty_board(stdout: &mut io::Stdout) -> io::Result<()> {
+    execute!(stdout, cursor::MoveTo(0, 0))?;
+    draw_title(stdout)?;
+
+    write!(stdout, "{:LEFT_W$}╔", "")?;
+    for _ in 0..BOARD_WIDTH {
+        write!(stdout, "══")?;
+    }
+    write!(stdout, "╗\x1b[K\r\n")?;
+
+    for _ in 0..BOARD_HEIGHT {
+        write!(stdout, "{:LEFT_W$}║", "")?;
+        for _ in 0..BOARD_WIDTH {
+            write!(stdout, "  ")?;
+        }
+        write!(stdout, "║\x1b[K\r\n")?;
     }
 
     write!(stdout, "{:LEFT_W$}╚", "")?;
@@ -294,7 +321,7 @@ pub fn draw_game_over(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
 
 pub fn draw_pause(stdout: &mut io::Stdout) -> io::Result<()> {
     let x = LEFT_W as u16;
-    let y = TITLE_HEIGHT + BOARD_HEIGHT as u16 / 2 - 2;
+    let y = TITLE_HEIGHT + BOARD_HEIGHT as u16 / 2 - 3;
 
     let inner_w = BOARD_WIDTH * 2;
     let border = "═".repeat(inner_w);
@@ -309,6 +336,43 @@ pub fn draw_pause(stdout: &mut io::Stdout) -> io::Result<()> {
         title_line,
         empty_line.clone(),
         hint_line,
+        empty_line.clone(),
+        border_line,
+    ];
+
+    for (i, row) in rows.iter().enumerate() {
+        execute!(stdout, cursor::MoveTo(x, y + i as u16))?;
+        write!(stdout, "{}", row.as_str().with(Color::White))?;
+    }
+
+    stdout.flush()?;
+    Ok(())
+}
+
+pub fn draw_level_select(stdout: &mut io::Stdout, level: u32) -> io::Result<()> {
+    let x = LEFT_W as u16;
+    let y = TITLE_HEIGHT + BOARD_HEIGHT as u16 / 2 - 5;
+
+    let inner_w = BOARD_WIDTH * 2;
+    let border = "═".repeat(inner_w);
+    let border_line = format!("╠{}╣", border);
+    let empty_line = format!("║{:^width$}║", "", width = inner_w);
+    let title_line = format!("║{:^width$}║", "SELECT LEVEL", width = inner_w);
+    let level_line = format!("║{:^width$}║", format!("< {} >", level), width = inner_w);
+    let hint1_line = format!("║{:^width$}║", "↑/↓ to change", width = inner_w);
+    let hint2_line = format!("║{:^width$}║", "[Enter] Start", width = inner_w);
+    let hint3_line = format!("║{:^width$}║", "[Q] Quit", width = inner_w);
+
+    let rows: Vec<String> = vec![
+        border_line.clone(),
+        empty_line.clone(),
+        title_line,
+        empty_line.clone(),
+        level_line,
+        empty_line.clone(),
+        hint1_line,
+        hint2_line,
+        hint3_line,
         empty_line.clone(),
         border_line,
     ];

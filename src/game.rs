@@ -44,6 +44,7 @@ pub struct Game {
     pub score: u32,
     pub lines: u32,
     pub level: u32,
+    pub start_level: u32,
     pub game_over: bool,
     pub last_move: LastMove,
     pub combo: i32,
@@ -55,7 +56,7 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new() -> Self {
+    pub fn new(start_level: u32) -> Self {
         let mut bag = Bag::new();
         let current_kind = bag.next();
         let mut next_queue = Vec::with_capacity(NEXT_COUNT);
@@ -71,7 +72,8 @@ impl Game {
             bag,
             score: 0,
             lines: 0,
-            level: 1,
+            level: start_level,
+            start_level,
             game_over: false,
             last_move: LastMove::None,
             combo: -1,
@@ -108,7 +110,6 @@ impl Game {
         true
     }
 
-    // T-Spin detection: 3-corner rule
     fn detect_tspin(&self) -> (bool, bool) {
         if self.current.kind != KIND_T || self.last_move != LastMove::Rotate {
             return (false, false);
@@ -135,7 +136,7 @@ impl Game {
             return (false, false);
         }
 
-        // Both front corners occupied -> Full T-Spin, otherwise Mini
+        // Full T-Spin if both front corners occupied, otherwise Mini
         if front_occupied == 2 {
             (true, false)
         } else {
@@ -304,9 +305,27 @@ impl Game {
     }
 
     pub fn tick(&mut self) {
-        if !self.move_piece(1, 0) {
+        let g = self.gravity();
+        if g >= 20.0 {
+            while self.move_piece(1, 0) {}
             if self.lock_delay.is_none() {
                 self.lock_delay = Some(Instant::now());
+            }
+        } else if g >= 1.0 {
+            let rows = g.floor() as i32;
+            for _ in 0..rows {
+                if !self.move_piece(1, 0) {
+                    if self.lock_delay.is_none() {
+                        self.lock_delay = Some(Instant::now());
+                    }
+                    return;
+                }
+            }
+        } else {
+            if !self.move_piece(1, 0) {
+                if self.lock_delay.is_none() {
+                    self.lock_delay = Some(Instant::now());
+                }
             }
         }
     }
@@ -322,7 +341,6 @@ impl Game {
             self.lines += cleared;
             self.combo += 1;
 
-            // Difficult clear: Tetris or any T-Spin line clear
             let is_difficult = cleared == 4 || is_tspin;
 
             let base = if is_tspin {
@@ -350,7 +368,6 @@ impl Game {
                 }
             };
 
-            // Back-to-back bonus: x1.5 for consecutive difficult clears
             let b2b_bonus = if is_difficult && self.back_to_back {
                 base / 2
             } else {
@@ -368,7 +385,6 @@ impl Game {
             let total = line_points + combo_points;
             self.score += total;
 
-            // All Clear check uses a temporary board with cleared rows removed
             let mut temp_board = self.board;
             let mut new_board = [[EMPTY; BOARD_WIDTH]; BOARD_HEIGHT];
             let mut dest = BOARD_HEIGHT - 1;
@@ -387,6 +403,7 @@ impl Game {
                     1 => 800,
                     2 => 1200,
                     3 => 1800,
+                    4 if is_difficult && self.back_to_back => 3200,
                     4 => 2000,
                     _ => 0,
                 };
@@ -396,7 +413,6 @@ impl Game {
             };
             self.score += pc_bonus;
 
-            // Build action label
             let mut label = String::new();
             if is_tspin {
                 if is_mini {
@@ -434,9 +450,8 @@ impl Game {
                 self.back_to_back = false;
             }
 
-            self.level = self.lines / 10 + 1;
+            self.level = self.start_level + self.lines / 10;
 
-            // Start animation instead of clearing immediately
             self.line_clear_anim = Some(LineClearAnimation::new(full_rows));
             return true;
         } else {
@@ -482,7 +497,7 @@ impl Game {
             } else if elapsed < total {
                 2
             } else {
-                return false; // animation finished
+                return false;
             };
             anim.phase = phase;
             true
@@ -505,19 +520,24 @@ impl Game {
         }
     }
 
+    /// Gravity in G (cells/frame at 60fps). Capped at 20G (level 25).
+    pub fn gravity(&self) -> f64 {
+        let lvl = self.level as f64;
+        let base = 0.8 - (lvl - 1.0) * 0.0024;
+        let time_per_row = base.powf(lvl - 1.0);
+        let g = 1.0 / (time_per_row * 60.0);
+        g.min(20.0)
+    }
+
     pub fn drop_interval(&self) -> Duration {
-        let ms = match self.level {
-            1 => 800,
-            2 => 720,
-            3 => 630,
-            4 => 550,
-            5 => 470,
-            6 => 380,
-            7 => 300,
-            8 => 220,
-            9 => 140,
-            _ => 80,
-        };
-        Duration::from_millis(ms)
+        let g = self.gravity();
+        if g >= 1.0 {
+            Duration::from_micros(16_667)
+        } else {
+            let lvl = self.level as f64;
+            let base = 0.8 - (lvl - 1.0) * 0.0024;
+            let time_per_row = base.powf(lvl - 1.0);
+            Duration::from_secs_f64(time_per_row)
+        }
     }
 }
