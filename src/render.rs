@@ -371,7 +371,7 @@ pub fn draw_game_over(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
     content.push(Some(format!("{:^width$}", format!("LINES: {}", game.lines), width = inner_w)));
     content.push(Some(format!("{:^width$}", format!("LEVEL: {}", game.level), width = inner_w)));
     content.push(None);
-    content.push(Some(format!("{:^width$}", "[R] Retry  [Q] Quit", width = inner_w)));
+    content.push(Some(format!("{:^width$}", "[R] Retry [Q] Quit", width = inner_w)));
     content.push(None);
 
     draw_full_board_overlay(stdout, &content)
