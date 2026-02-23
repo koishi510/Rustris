@@ -42,7 +42,7 @@ const DUTY_CYCLE: f32 = 0.25;
 
 const SFX_AMPLITUDE: f32 = 0.35;
 
-include!("../tetris_notes.rs");
+include!("tetris_notes.rs");
 
 const TOTAL_BEATS: f32 = 512.0;
 
@@ -168,6 +168,7 @@ pub enum Sfx {
     AllClear,
     Combo(u32),
     BackToBack,
+    Clear,
 }
 
 impl Sfx {
@@ -216,6 +217,10 @@ impl Sfx {
                 vec![(base, 25), (base * 1.25, 35)]
             }
             Sfx::BackToBack => vec![(880.0, 30), (1047.0, 30), (1319.0, 50)],
+            Sfx::Clear => vec![
+                (784.0, 80), (988.0, 80), (1175.0, 80),
+                (1568.0, 100), (1175.0, 60), (1568.0, 150),
+            ],
         }
     }
 }

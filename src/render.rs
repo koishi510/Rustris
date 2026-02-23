@@ -2,11 +2,10 @@ use crossterm::{cursor, execute, style::{Color, Stylize}};
 use std::io::{self, Write};
 use std::time::Duration;
 
-use crate::game::Game;
+use crate::game::{Game, GameMode};
 use crate::piece::*;
 
 const LEFT_W: usize = 12;
-const TITLE_HEIGHT: u16 = 7;
 
 fn color_for(id: u8) -> Color {
     PIECE_COLORS[(id - 1) as usize]
@@ -222,17 +221,64 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
                     draw_piece_preview(stdout, kind, pr)?;
                 }
             }
-            5 => write!(stdout, "  SCORE: {}", game.score)?,
-            6 => write!(stdout, "  LINES: {}", game.lines)?,
-            7 => write!(stdout, "  LEVEL: {}", game.level)?,
-            9 => {
-                if show_action {
-                    let action = game.last_action.as_ref().unwrap();
-                    write!(stdout, "  {}", action.label.as_str().with(Color::Yellow))?;
+            5 => match game.mode {
+                GameMode::Marathon | GameMode::Endless => write!(stdout, "  SCORE: {}", game.score)?,
+                GameMode::Sprint => {
+                    let secs = game.elapsed.as_secs();
+                    let centis = game.elapsed.subsec_millis() / 10;
+                    write!(stdout, "  TIME: {}:{:02}.{:02}", secs / 60, secs % 60, centis)?;
                 }
-            }
-            10 => {
-                if show_action {
+                GameMode::Ultra => {
+                    if let Some(rem) = game.time_remaining() {
+                        let secs = rem.as_secs();
+                        write!(stdout, "  TIME: {}:{:02}", secs / 60, secs % 60)?;
+                    }
+                }
+            },
+            6 => match game.mode {
+                GameMode::Marathon | GameMode::Endless => write!(stdout, "  LINES: {}", game.lines)?,
+                GameMode::Sprint => {
+                    write!(stdout, "  LINES: {} / 40", game.lines)?;
+                }
+                GameMode::Ultra => write!(stdout, "  SCORE: {}", game.score)?,
+            },
+            7 => match game.mode {
+                GameMode::Marathon | GameMode::Endless => write!(stdout, "  LEVEL: {}", game.level)?,
+                GameMode::Sprint => write!(stdout, "  LEVEL: {}", game.level)?,
+                GameMode::Ultra => write!(stdout, "  LINES: {}", game.lines)?,
+            },
+            8 => match game.mode {
+                GameMode::Marathon => {
+                    let goal = 150u32.saturating_sub(game.lines);
+                    write!(stdout, "  GOAL: {}", goal)?;
+                }
+                _ => {}
+            },
+            9 => match game.mode {
+                GameMode::Ultra => write!(stdout, "  LEVEL: {}", game.level)?,
+                _ => {
+                    if show_action {
+                        let action = game.last_action.as_ref().unwrap();
+                        write!(stdout, "  {}", action.label.as_str().with(Color::Yellow))?;
+                    }
+                }
+            },
+            10 => match game.mode {
+                GameMode::Ultra => {
+                    if show_action {
+                        let action = game.last_action.as_ref().unwrap();
+                        write!(stdout, "  {}", action.label.as_str().with(Color::Yellow))?;
+                    }
+                }
+                _ => {
+                    if show_action {
+                        let action = game.last_action.as_ref().unwrap();
+                        write!(stdout, "  {}", format!("+{}", action.points).with(Color::Yellow))?;
+                    }
+                }
+            },
+            11 => {
+                if game.mode == GameMode::Ultra && show_action {
                     let action = game.last_action.as_ref().unwrap();
                     write!(stdout, "  {}", format!("+{}", action.points).with(Color::Yellow))?;
                 }
@@ -255,93 +301,109 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
 }
 
 
-pub fn draw_game_over(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
-    let x = LEFT_W as u16;
-    let y = TITLE_HEIGHT + BOARD_HEIGHT as u16 / 2 - 5;
-
+fn draw_full_board_overlay(
+    stdout: &mut io::Stdout,
+    content: &[Option<String>],
+) -> io::Result<()> {
     let inner_w = BOARD_WIDTH * 2;
-    let border = "═".repeat(inner_w);
-    let border_line = format!("╠{}╣", border);
-    let empty_line = format!("║{:^width$}║", "", width = inner_w);
-    let title_line = format!("║{:^width$}║", "GAME  OVER", width = inner_w);
-    let score_line = format!("║{:^width$}║", format!("SCORE: {}", game.score), width = inner_w);
-    let lines_line = format!("║{:^width$}║", format!("LINES: {}", game.lines), width = inner_w);
-    let level_line = format!("║{:^width$}║", format!("LEVEL: {}", game.level), width = inner_w);
-    let hint_line = format!("║{:^width$}║", "[R] Retry [Q] Quit", width = inner_w);
+    let start_row = (BOARD_HEIGHT - content.len()) / 2;
 
-    let rows: Vec<String> = vec![
-        border_line.clone(),
-        empty_line.clone(),
-        title_line,
-        empty_line.clone(),
-        score_line,
-        lines_line,
-        level_line,
-        empty_line.clone(),
-        hint_line,
-        empty_line.clone(),
-        border_line,
-    ];
+    write!(stdout, "{:LEFT_W$}╔", "")?;
+    for _ in 0..BOARD_WIDTH {
+        write!(stdout, "══")?;
+    }
+    write!(stdout, "╗\x1b[K\r\n")?;
 
-    for (i, row) in rows.iter().enumerate() {
-        execute!(stdout, cursor::MoveTo(x, y + i as u16))?;
-        write!(stdout, "{}", row.as_str().with(Color::White))?;
+    for row in 0..BOARD_HEIGHT {
+        write!(stdout, "{:LEFT_W$}║", "")?;
+        if row >= start_row && row - start_row < content.len() {
+            match &content[row - start_row] {
+                Some(text) => write!(stdout, "{}", text)?,
+                None => write!(stdout, "{:width$}", "", width = inner_w)?,
+            }
+        } else {
+            write!(stdout, "{:width$}", "", width = inner_w)?;
+        }
+        write!(stdout, "║\x1b[K\r\n")?;
     }
 
+    write!(stdout, "{:LEFT_W$}╚", "")?;
+    for _ in 0..BOARD_WIDTH {
+        write!(stdout, "══")?;
+    }
+    write!(stdout, "╝\x1b[K\r\n")?;
+
+    write!(stdout, "\x1b[J")?;
     stdout.flush()?;
     Ok(())
+}
+
+pub fn draw_game_over(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
+    execute!(stdout, cursor::MoveTo(0, 0))?;
+    draw_title(stdout)?;
+
+    let inner_w = BOARD_WIDTH * 2;
+
+    let title = if game.cleared {
+        "CLEAR!"
+    } else if game.mode == GameMode::Ultra && game.elapsed >= std::time::Duration::from_secs(120) {
+        "TIME'S UP!"
+    } else {
+        "GAME  OVER"
+    };
+
+    let mut content: Vec<Option<String>> = vec![
+        None,
+        Some(format!("{:^width$}", title, width = inner_w)),
+        None,
+    ];
+
+    if game.mode == GameMode::Sprint && game.cleared {
+        let secs = game.elapsed.as_secs();
+        let centis = game.elapsed.subsec_millis() / 10;
+        content.push(Some(format!(
+            "{:^width$}",
+            format!("TIME: {}:{:02}.{:02}", secs / 60, secs % 60, centis),
+            width = inner_w
+        )));
+    }
+    content.push(Some(format!("{:^width$}", format!("SCORE: {}", game.score), width = inner_w)));
+    content.push(Some(format!("{:^width$}", format!("LINES: {}", game.lines), width = inner_w)));
+    content.push(Some(format!("{:^width$}", format!("LEVEL: {}", game.level), width = inner_w)));
+    content.push(None);
+    content.push(Some(format!("{:^width$}", "[R] Retry  [Q] Quit", width = inner_w)));
+    content.push(None);
+
+    draw_full_board_overlay(stdout, &content)
 }
 
 pub fn draw_pause(stdout: &mut io::Stdout, bgm_on: bool, sfx_on: bool) -> io::Result<()> {
-    let x = LEFT_W as u16;
-    let y = TITLE_HEIGHT + BOARD_HEIGHT as u16 / 2 - 5;
+    execute!(stdout, cursor::MoveTo(0, 0))?;
+    draw_title(stdout)?;
 
     let inner_w = BOARD_WIDTH * 2;
-    let border = "═".repeat(inner_w);
-    let border_line = format!("╠{}╣", border);
-    let empty_line = format!("║{:^width$}║", "", width = inner_w);
-    let title_line = format!("║{:^width$}║", "PAUSED", width = inner_w);
-    let hint_line = format!("║{:^width$}║", "[Esc] Resume", width = inner_w);
-    let retry_line = format!("║{:^width$}║", "[R] Retry", width = inner_w);
-    let quit_line = format!("║{:^width$}║", "[Q] Quit", width = inner_w);
     let bgm_status = if bgm_on { "ON" } else { "OFF" };
     let sfx_status = if sfx_on { "ON" } else { "OFF" };
-    let bgm_line = format!(
-        "║{:^width$}║",
-        format!("[M] BGM: {}", bgm_status),
-        width = inner_w
-    );
-    let sfx_line = format!(
-        "║{:^width$}║",
-        format!("[N] SFX: {}", sfx_status),
-        width = inner_w
-    );
 
-    let rows: Vec<String> = vec![
-        border_line.clone(),
-        empty_line.clone(),
-        title_line,
-        empty_line.clone(),
-        hint_line,
-        retry_line,
-        quit_line,
-        bgm_line,
-        sfx_line,
-        empty_line.clone(),
-        border_line,
+    let content: Vec<Option<String>> = vec![
+        None,
+        Some(format!("{:^width$}", "PAUSED", width = inner_w)),
+        None,
+        Some(format!("{:^width$}", "[Esc] Resume", width = inner_w)),
+        Some(format!("{:^width$}", "[R] Retry", width = inner_w)),
+        Some(format!("{:^width$}", "[Q] Quit", width = inner_w)),
+        Some(format!("{:^width$}", "[H] Help", width = inner_w)),
+        Some(format!("{:^width$}", format!("[M] BGM: {}", bgm_status), width = inner_w)),
+        Some(format!("{:^width$}", format!("[N] SFX: {}", sfx_status), width = inner_w)),
+        None,
     ];
 
-    for (i, row) in rows.iter().enumerate() {
-        execute!(stdout, cursor::MoveTo(x, y + i as u16))?;
-        write!(stdout, "{}", row.as_str().with(Color::White))?;
-    }
-
-    stdout.flush()?;
-    Ok(())
+    draw_full_board_overlay(stdout, &content)
 }
 
-pub fn draw_level_select(
+pub fn draw_mode_select(
     stdout: &mut io::Stdout,
+    mode: GameMode,
     level: u32,
     bgm_on: bool,
     sfx_on: bool,
@@ -353,19 +415,91 @@ pub fn draw_level_select(
     let bgm_status = if bgm_on { "ON" } else { "OFF" };
     let sfx_status = if sfx_on { "ON" } else { "OFF" };
 
-    let content: Vec<Option<String>> = vec![
+    let mode_name = match mode {
+        GameMode::Marathon => "Marathon",
+        GameMode::Sprint => "Sprint",
+        GameMode::Ultra => "Ultra",
+        GameMode::Endless => "Endless",
+    };
+
+    let mut content: Vec<Option<String>> = vec![
         None,
-        Some(format!("{:^width$}", "SELECT LEVEL", width = inner_w)),
-        None,
-        Some(format!("{:^width$}", format!("< {} >", level), width = inner_w)),
-        None,
-        Some(format!("{:^width$}", "↑/↓ to change", width = inner_w)),
-        Some(format!("{:^width$}", "[Enter] Start", width = inner_w)),
-        Some(format!("{:^width$}", "[Q] Quit", width = inner_w)),
-        Some(format!("{:^width$}", format!("[M] BGM: {}", bgm_status), width = inner_w)),
-        Some(format!("{:^width$}", format!("[N] SFX: {}", sfx_status), width = inner_w)),
+        Some(format!("{:^width$}", format!("< {} >", mode_name), width = inner_w)),
         None,
     ];
+
+    if mode == GameMode::Marathon || mode == GameMode::Endless {
+        content.push(Some(format!("{:^width$}", format!("Level: < {} >", level), width = inner_w)));
+    }
+
+    content.push(None);
+    content.push(Some(format!("{:^width$}", "←/→ change mode", width = inner_w)));
+    if mode == GameMode::Marathon || mode == GameMode::Endless {
+        content.push(Some(format!("{:^width$}", "↑/↓ change level", width = inner_w)));
+    }
+    content.push(Some(format!("{:^width$}", "[Enter] Start", width = inner_w)));
+    content.push(Some(format!("{:^width$}", "[H] Help", width = inner_w)));
+    content.push(Some(format!("{:^width$}", "[Q] Quit", width = inner_w)));
+    content.push(Some(format!("{:^width$}", format!("[M] BGM: {}", bgm_status), width = inner_w)));
+    content.push(Some(format!("{:^width$}", format!("[N] SFX: {}", sfx_status), width = inner_w)));
+    content.push(None);
+
+    let start_row = (BOARD_HEIGHT - content.len()) / 2;
+
+    write!(stdout, "{:LEFT_W$}╔", "")?;
+    for _ in 0..BOARD_WIDTH {
+        write!(stdout, "══")?;
+    }
+    write!(stdout, "╗\x1b[K\r\n")?;
+
+    for row in 0..BOARD_HEIGHT {
+        write!(stdout, "{:LEFT_W$}║", "")?;
+        if row >= start_row && row - start_row < content.len() {
+            match &content[row - start_row] {
+                Some(text) => write!(stdout, "{}", text)?,
+                None => write!(stdout, "{:width$}", "", width = inner_w)?,
+            }
+        } else {
+            write!(stdout, "{:width$}", "", width = inner_w)?;
+        }
+        write!(stdout, "║\x1b[K\r\n")?;
+    }
+
+    write!(stdout, "{:LEFT_W$}╚", "")?;
+    for _ in 0..BOARD_WIDTH {
+        write!(stdout, "══")?;
+    }
+    write!(stdout, "╝\x1b[K\r\n")?;
+
+    write!(stdout, "\x1b[J")?;
+    stdout.flush()?;
+    Ok(())
+}
+
+pub fn draw_help(stdout: &mut io::Stdout) -> io::Result<()> {
+    execute!(stdout, cursor::MoveTo(0, 0))?;
+    draw_title(stdout)?;
+
+    let inner_w = BOARD_WIDTH * 2;
+
+    let content: Vec<Option<String>> = vec![
+        None,
+        Some(format!("{:^width$}", "CONTROLS", width = inner_w)),
+        None,
+        Some(format!("{:^width$}", "←/→     Move piece", width = inner_w)),
+        Some(format!("{:^width$}", "↓       Soft drop ", width = inner_w)),
+        Some(format!("{:^width$}", "Space   Hard drop ", width = inner_w)),
+        Some(format!("{:^width$}", "↑/X     Rotate CW ", width = inner_w)),
+        Some(format!("{:^width$}", "Z       Rotate CCW", width = inner_w)),
+        Some(format!("{:^width$}", "C       Hold piece", width = inner_w)),
+        Some(format!("{:^width$}", "Esc     Pause     ", width = inner_w)),
+        None,
+        Some(format!("{:^width$}", "[M] BGM  [N] SFX", width = inner_w)),
+        None,
+        Some(format!("{:^width$}", "[Esc] Return", width = inner_w)),
+        None,
+    ];
+
     let start_row = (BOARD_HEIGHT - content.len()) / 2;
 
     write!(stdout, "{:LEFT_W$}╔", "")?;

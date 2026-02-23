@@ -2,6 +2,14 @@ use std::time::{Duration, Instant};
 
 use crate::piece::*;
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum GameMode {
+    Marathon,
+    Sprint,
+    Ultra,
+    Endless,
+}
+
 pub const LOCK_DELAY: Duration = Duration::from_millis(500);
 pub const LINE_CLEAR_ANIM_DURATION: Duration = Duration::from_millis(300);
 pub const ARE_DELAY: Duration = Duration::from_millis(100);
@@ -55,10 +63,14 @@ pub struct Game {
     pub lock_delay: Option<Instant>,
     pub line_clear_anim: Option<LineClearAnimation>,
     pub are_timer: Option<Instant>,
+    pub mode: GameMode,
+    pub game_start: Instant,
+    pub elapsed: Duration,
+    pub cleared: bool,
 }
 
 impl Game {
-    pub fn new(start_level: u32) -> Self {
+    pub fn new(start_level: u32, mode: GameMode) -> Self {
         let mut bag = Bag::new();
         let current_kind = bag.next();
         let mut next_queue = Vec::with_capacity(NEXT_COUNT);
@@ -85,6 +97,10 @@ impl Game {
             lock_delay: None,
             line_clear_anim: None,
             are_timer: None,
+            mode,
+            game_start: Instant::now(),
+            elapsed: Duration::ZERO,
+            cleared: false,
         }
     }
 
@@ -453,7 +469,18 @@ impl Game {
                 self.back_to_back = false;
             }
 
-            self.level = self.start_level + self.lines / 10;
+            if self.mode == GameMode::Marathon || self.mode == GameMode::Endless {
+                self.level = self.start_level + self.lines / 10;
+            }
+
+            if (self.mode == GameMode::Marathon && self.lines >= 150)
+                || (self.mode == GameMode::Sprint && self.lines >= 40)
+            {
+                self.cleared = true;
+                self.game_over = true;
+                self.remove_rows(&full_rows);
+                return true;
+            }
 
             self.line_clear_anim = Some(LineClearAnimation::new(full_rows));
             return true;
@@ -538,11 +565,10 @@ impl Game {
         }
     }
 
-    /// Gravity in G (cells/frame at 60fps). Capped at 20G (level 25).
+    /// Guideline gravity: time_per_row = (0.8 - (level-1)*0.007)^(level-1). Capped at 20G.
     pub fn gravity(&self) -> f64 {
         let lvl = self.level as f64;
-        let base = 0.8 - (lvl - 1.0) * 0.0024;
-        let time_per_row = base.powf(lvl - 1.0);
+        let time_per_row = (0.8 - (lvl - 1.0) * 0.007).powf(lvl - 1.0);
         let g = 1.0 / (time_per_row * 60.0);
         g.min(20.0)
     }
@@ -553,9 +579,24 @@ impl Game {
             Duration::from_micros(16_667)
         } else {
             let lvl = self.level as f64;
-            let base = 0.8 - (lvl - 1.0) * 0.0024;
-            let time_per_row = base.powf(lvl - 1.0);
+            let time_per_row = (0.8 - (lvl - 1.0) * 0.007).powf(lvl - 1.0);
             Duration::from_secs_f64(time_per_row)
+        }
+    }
+
+    pub fn update_elapsed(&mut self) {
+        self.elapsed = self.game_start.elapsed();
+    }
+
+    pub fn reset_game_start(&mut self) {
+        self.game_start = Instant::now() - self.elapsed;
+    }
+
+    pub fn time_remaining(&self) -> Option<Duration> {
+        if self.mode == GameMode::Ultra {
+            Some(Duration::from_secs(120).saturating_sub(self.elapsed))
+        } else {
+            None
         }
     }
 }

@@ -13,7 +13,7 @@ use std::io;
 use std::time::{Duration, Instant};
 
 use audio::Sfx;
-use game::{Game, LastMove, ARE_DELAY, LOCK_DELAY};
+use game::{Game, GameMode, LastMove, ARE_DELAY, LOCK_DELAY};
 
 const DAS_DELAY: Duration = Duration::from_millis(167);
 const ARR_INTERVAL: Duration = Duration::from_millis(33);
@@ -55,11 +55,11 @@ fn main() -> io::Result<()> {
 
     let result = (|| {
         loop {
-            let level = match select_level(&mut stdout, &mut music)? {
-                Some(l) => l,
+            let (mode, level) = match select_mode(&mut stdout, &mut music)? {
+                Some(ml) => ml,
                 None => return Ok(()),
             };
-            run_game(&mut stdout, level, &mut music)?;
+            run_game(&mut stdout, mode, level, &mut music)?;
         }
     })();
 
@@ -69,10 +69,11 @@ fn main() -> io::Result<()> {
     result
 }
 
-fn select_level(
+fn select_mode(
     stdout: &mut io::Stdout,
     music: &mut Option<audio::MusicPlayer>,
-) -> io::Result<Option<u32>> {
+) -> io::Result<Option<(GameMode, u32)>> {
+    let mut mode = GameMode::Marathon;
     let mut level: u32 = 1;
 
     let (bgm_on, sfx_on) = match music {
@@ -80,13 +81,35 @@ fn select_level(
         None => (false, false),
     };
 
-    render::draw_level_select(stdout, level, bgm_on, sfx_on)?;
+    render::draw_mode_select(stdout, mode, level, bgm_on, sfx_on)?;
 
     loop {
         if let Event::Key(KeyEvent { code, .. }) = event::read()? {
             match code {
+                KeyCode::Left => {
+                    mode = match mode {
+                        GameMode::Marathon => GameMode::Endless,
+                        GameMode::Sprint => GameMode::Marathon,
+                        GameMode::Ultra => GameMode::Sprint,
+                        GameMode::Endless => GameMode::Ultra,
+                    };
+                    if let Some(m) = music.as_ref() {
+                        m.play_sfx(Sfx::MenuMove);
+                    }
+                }
+                KeyCode::Right => {
+                    mode = match mode {
+                        GameMode::Marathon => GameMode::Sprint,
+                        GameMode::Sprint => GameMode::Ultra,
+                        GameMode::Ultra => GameMode::Endless,
+                        GameMode::Endless => GameMode::Marathon,
+                    };
+                    if let Some(m) = music.as_ref() {
+                        m.play_sfx(Sfx::MenuMove);
+                    }
+                }
                 KeyCode::Up => {
-                    if level < 25 {
+                    if (mode == GameMode::Marathon || mode == GameMode::Endless) && level < 20 {
                         level += 1;
                         if let Some(m) = music.as_ref() {
                             m.play_sfx(Sfx::MenuMove);
@@ -94,7 +117,7 @@ fn select_level(
                     }
                 }
                 KeyCode::Down => {
-                    if level > 1 {
+                    if (mode == GameMode::Marathon || mode == GameMode::Endless) && level > 1 {
                         level -= 1;
                         if let Some(m) = music.as_ref() {
                             m.play_sfx(Sfx::MenuMove);
@@ -105,7 +128,19 @@ fn select_level(
                     if let Some(m) = music.as_ref() {
                         m.play_sfx(Sfx::MenuSelect);
                     }
-                    return Ok(Some(level));
+                    let start_level = match mode {
+                        GameMode::Marathon | GameMode::Endless => level,
+                        GameMode::Sprint | GameMode::Ultra => 1,
+                    };
+                    return Ok(Some((mode, start_level)));
+                }
+                KeyCode::Char('h') | KeyCode::Char('H') => {
+                    render::draw_help(stdout)?;
+                    loop {
+                        if let Event::Key(KeyEvent { code: KeyCode::Esc, .. }) = event::read()? {
+                            break;
+                        }
+                    }
                 }
                 KeyCode::Char('m') | KeyCode::Char('M') => {
                     if let Some(m) = music.as_mut() {
@@ -125,7 +160,7 @@ fn select_level(
                 Some(m) => (m.bgm_enabled(), m.sfx_enabled()),
                 None => (false, false),
             };
-            render::draw_level_select(stdout, level, bgm_on, sfx_on)?;
+            render::draw_mode_select(stdout, mode, level, bgm_on, sfx_on)?;
         }
     }
 }
@@ -172,10 +207,11 @@ fn play_clear_sfx(music: &audio::MusicPlayer, game: &Game, prev_level: u32) {
 
 fn run_game(
     stdout: &mut io::Stdout,
+    mode: GameMode,
     start_level: u32,
     music: &mut Option<audio::MusicPlayer>,
 ) -> io::Result<()> {
-    let mut game = Game::new(start_level);
+    let mut game = Game::new(start_level, mode);
     let mut last_tick = Instant::now();
     let mut das: Option<DasState> = None;
     if let Some(m) = music.as_mut() {
@@ -193,9 +229,12 @@ fn run_game(
         if game.game_over {
             if let Some(m) = music.as_mut() {
                 m.stop();
-                m.play_sfx(Sfx::GameOver);
+                if game.cleared {
+                    m.play_sfx(Sfx::Clear);
+                } else {
+                    m.play_sfx(Sfx::GameOver);
+                }
             }
-            render::draw(stdout, &game)?;
             render::draw_game_over(stdout, &game)?;
             loop {
                 if let Event::Key(KeyEvent { code, .. }) = event::read()? {
@@ -216,7 +255,7 @@ fn run_game(
                     }
                 }
             }
-            game = Game::new(start_level);
+            game = Game::new(start_level, mode);
             last_tick = Instant::now();
             das = None;
             if let Some(m) = music.as_mut() {
@@ -224,6 +263,11 @@ fn run_game(
             }
             execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
             continue;
+        }
+
+        game.update_elapsed();
+        if game.mode == GameMode::Ultra && game.elapsed >= Duration::from_secs(120) {
+            game.game_over = true;
         }
 
         render::draw(stdout, &game)?;
@@ -264,6 +308,10 @@ fn run_game(
             } else {
                 timeout = timeout.min(ARR_INTERVAL.saturating_sub(d.last_arr_move.elapsed()));
             }
+        }
+
+        if let Some(remaining) = game.time_remaining() {
+            timeout = timeout.min(remaining);
         }
 
         if event::poll(timeout)? {
@@ -314,6 +362,19 @@ fn run_game(
                                         };
                                         render::draw_pause(stdout, bgm_on, sfx_on)?;
                                     }
+                                    KeyCode::Char('h') | KeyCode::Char('H') => {
+                                        render::draw_help(stdout)?;
+                                        loop {
+                                            if let Event::Key(KeyEvent { code: KeyCode::Esc, .. }) = event::read()? {
+                                                break;
+                                            }
+                                        }
+                                        let (bgm_on, sfx_on) = match music.as_ref() {
+                                            Some(m) => (m.bgm_enabled(), m.sfx_enabled()),
+                                            None => (false, false),
+                                        };
+                                        render::draw_pause(stdout, bgm_on, sfx_on)?;
+                                    }
                                     _ => {}
                                 }
                             }
@@ -322,7 +383,7 @@ fn run_game(
                             if let Some(m) = music.as_ref() {
                                 m.play_sfx(Sfx::MenuSelect);
                             }
-                            game = Game::new(start_level);
+                            game = Game::new(start_level, mode);
                             last_tick = Instant::now();
                             das = None;
                             if let Some(m) = music.as_mut() {
@@ -335,6 +396,7 @@ fn run_game(
                             m.resume();
                             m.play_sfx(Sfx::Resume);
                         }
+                        game.reset_game_start();
                         last_tick = Instant::now();
                         if game.lock_delay.is_some() {
                             game.lock_delay = Some(Instant::now());
