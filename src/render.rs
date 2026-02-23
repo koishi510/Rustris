@@ -132,7 +132,7 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
     let ghost_cells: [(i32, i32); 4];
     let current_cells: [(i32, i32); 4];
     let current_color: Color;
-    if animating {
+    if animating || game.in_are() {
         ghost_cells = [(-1, -1); 4];
         current_cells = [(-1, -1); 4];
         current_color = Color::White;
@@ -254,35 +254,6 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
     Ok(())
 }
 
-pub fn draw_empty_board(stdout: &mut io::Stdout) -> io::Result<()> {
-    execute!(stdout, cursor::MoveTo(0, 0))?;
-    draw_title(stdout)?;
-
-    write!(stdout, "{:LEFT_W$}╔", "")?;
-    for _ in 0..BOARD_WIDTH {
-        write!(stdout, "══")?;
-    }
-    write!(stdout, "╗\x1b[K\r\n")?;
-
-    for _ in 0..BOARD_HEIGHT {
-        write!(stdout, "{:LEFT_W$}║", "")?;
-        for _ in 0..BOARD_WIDTH {
-            write!(stdout, "  ")?;
-        }
-        write!(stdout, "║\x1b[K\r\n")?;
-    }
-
-    write!(stdout, "{:LEFT_W$}╚", "")?;
-    for _ in 0..BOARD_WIDTH {
-        write!(stdout, "══")?;
-    }
-    write!(stdout, "╝\x1b[K\r\n")?;
-
-    write!(stdout, "\x1b[J")?;
-
-    stdout.flush()?;
-    Ok(())
-}
 
 pub fn draw_game_over(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
     let x = LEFT_W as u16;
@@ -323,7 +294,7 @@ pub fn draw_game_over(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
 
 pub fn draw_pause(stdout: &mut io::Stdout, bgm_on: bool, sfx_on: bool) -> io::Result<()> {
     let x = LEFT_W as u16;
-    let y = TITLE_HEIGHT + BOARD_HEIGHT as u16 / 2 - 4;
+    let y = TITLE_HEIGHT + BOARD_HEIGHT as u16 / 2 - 5;
 
     let inner_w = BOARD_WIDTH * 2;
     let border = "═".repeat(inner_w);
@@ -331,6 +302,7 @@ pub fn draw_pause(stdout: &mut io::Stdout, bgm_on: bool, sfx_on: bool) -> io::Re
     let empty_line = format!("║{:^width$}║", "", width = inner_w);
     let title_line = format!("║{:^width$}║", "PAUSED", width = inner_w);
     let hint_line = format!("║{:^width$}║", "[Esc] Resume", width = inner_w);
+    let retry_line = format!("║{:^width$}║", "[R] Retry", width = inner_w);
     let quit_line = format!("║{:^width$}║", "[Q] Quit", width = inner_w);
     let bgm_status = if bgm_on { "ON" } else { "OFF" };
     let sfx_status = if sfx_on { "ON" } else { "OFF" };
@@ -351,6 +323,7 @@ pub fn draw_pause(stdout: &mut io::Stdout, bgm_on: bool, sfx_on: bool) -> io::Re
         title_line,
         empty_line.clone(),
         hint_line,
+        retry_line,
         quit_line,
         bgm_line,
         sfx_line,
@@ -373,52 +346,54 @@ pub fn draw_level_select(
     bgm_on: bool,
     sfx_on: bool,
 ) -> io::Result<()> {
-    let x = LEFT_W as u16;
-    let y = TITLE_HEIGHT + BOARD_HEIGHT as u16 / 2 - 6;
+    execute!(stdout, cursor::MoveTo(0, 0))?;
+    draw_title(stdout)?;
 
     let inner_w = BOARD_WIDTH * 2;
-    let border = "═".repeat(inner_w);
-    let border_line = format!("╠{}╣", border);
-    let empty_line = format!("║{:^width$}║", "", width = inner_w);
-    let title_line = format!("║{:^width$}║", "SELECT LEVEL", width = inner_w);
-    let level_line = format!("║{:^width$}║", format!("< {} >", level), width = inner_w);
-    let hint1_line = format!("║{:^width$}║", "↑/↓ to change", width = inner_w);
-    let hint2_line = format!("║{:^width$}║", "[Enter] Start", width = inner_w);
-    let hint3_line = format!("║{:^width$}║", "[Q] Quit", width = inner_w);
     let bgm_status = if bgm_on { "ON" } else { "OFF" };
     let sfx_status = if sfx_on { "ON" } else { "OFF" };
-    let bgm_line = format!(
-        "║{:^width$}║",
-        format!("[M] BGM: {}", bgm_status),
-        width = inner_w
-    );
-    let sfx_line = format!(
-        "║{:^width$}║",
-        format!("[N] SFX: {}", sfx_status),
-        width = inner_w
-    );
 
-    let rows: Vec<String> = vec![
-        border_line.clone(),
-        empty_line.clone(),
-        title_line,
-        empty_line.clone(),
-        level_line,
-        empty_line.clone(),
-        hint1_line,
-        hint2_line,
-        hint3_line,
-        bgm_line,
-        sfx_line,
-        empty_line.clone(),
-        border_line,
+    let content: Vec<Option<String>> = vec![
+        None,
+        Some(format!("{:^width$}", "SELECT LEVEL", width = inner_w)),
+        None,
+        Some(format!("{:^width$}", format!("< {} >", level), width = inner_w)),
+        None,
+        Some(format!("{:^width$}", "↑/↓ to change", width = inner_w)),
+        Some(format!("{:^width$}", "[Enter] Start", width = inner_w)),
+        Some(format!("{:^width$}", "[Q] Quit", width = inner_w)),
+        Some(format!("{:^width$}", format!("[M] BGM: {}", bgm_status), width = inner_w)),
+        Some(format!("{:^width$}", format!("[N] SFX: {}", sfx_status), width = inner_w)),
+        None,
     ];
+    let start_row = (BOARD_HEIGHT - content.len()) / 2;
 
-    for (i, row) in rows.iter().enumerate() {
-        execute!(stdout, cursor::MoveTo(x, y + i as u16))?;
-        write!(stdout, "{}", row.as_str().with(Color::White))?;
+    write!(stdout, "{:LEFT_W$}╔", "")?;
+    for _ in 0..BOARD_WIDTH {
+        write!(stdout, "══")?;
+    }
+    write!(stdout, "╗\x1b[K\r\n")?;
+
+    for row in 0..BOARD_HEIGHT {
+        write!(stdout, "{:LEFT_W$}║", "")?;
+        if row >= start_row && row - start_row < content.len() {
+            match &content[row - start_row] {
+                Some(text) => write!(stdout, "{}", text)?,
+                None => write!(stdout, "{:width$}", "", width = inner_w)?,
+            }
+        } else {
+            write!(stdout, "{:width$}", "", width = inner_w)?;
+        }
+        write!(stdout, "║\x1b[K\r\n")?;
     }
 
+    write!(stdout, "{:LEFT_W$}╚", "")?;
+    for _ in 0..BOARD_WIDTH {
+        write!(stdout, "══")?;
+    }
+    write!(stdout, "╝\x1b[K\r\n")?;
+
+    write!(stdout, "\x1b[J")?;
     stdout.flush()?;
     Ok(())
 }

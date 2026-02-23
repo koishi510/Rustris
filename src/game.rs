@@ -4,6 +4,7 @@ use crate::piece::*;
 
 pub const LOCK_DELAY: Duration = Duration::from_millis(500);
 pub const LINE_CLEAR_ANIM_DURATION: Duration = Duration::from_millis(300);
+pub const ARE_DELAY: Duration = Duration::from_millis(100);
 
 pub struct LineClearAnimation {
     pub rows: Vec<usize>,
@@ -53,6 +54,7 @@ pub struct Game {
     pub last_action_time: Instant,
     pub lock_delay: Option<Instant>,
     pub line_clear_anim: Option<LineClearAnimation>,
+    pub are_timer: Option<Instant>,
 }
 
 impl Game {
@@ -82,6 +84,7 @@ impl Game {
             last_action_time: Instant::now(),
             lock_delay: None,
             line_clear_anim: None,
+            are_timer: None,
         }
     }
 
@@ -474,7 +477,7 @@ impl Game {
             }
         }
 
-        self.spawn_next();
+        self.are_timer = Some(Instant::now());
         false
     }
 
@@ -482,7 +485,7 @@ impl Game {
         if let Some(anim) = self.line_clear_anim.take() {
             self.remove_rows(&anim.rows);
         }
-        self.spawn_next();
+        self.are_timer = Some(Instant::now());
     }
 
     pub fn update_animation(&mut self) -> bool {
@@ -508,6 +511,21 @@ impl Game {
 
     pub fn is_animating(&self) -> bool {
         self.line_clear_anim.is_some()
+    }
+
+    pub fn in_are(&self) -> bool {
+        self.are_timer.is_some()
+    }
+
+    pub fn check_are(&mut self) -> bool {
+        if let Some(start) = self.are_timer {
+            if start.elapsed() >= ARE_DELAY {
+                self.are_timer = None;
+                self.spawn_next();
+                return true;
+            }
+        }
+        false
     }
 
     pub fn ghost_row(&self) -> i32 {
