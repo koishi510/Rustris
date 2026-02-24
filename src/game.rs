@@ -1,13 +1,13 @@
 use std::time::{Duration, Instant};
 
 use crate::piece::*;
+use crate::settings::Settings;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum GameMode {
     Marathon,
     Sprint,
     Ultra,
-    Endless,
 }
 
 pub const LOCK_DELAY: Duration = Duration::from_millis(500);
@@ -67,14 +67,25 @@ pub struct Game {
     pub game_start: Instant,
     pub elapsed: Duration,
     pub cleared: bool,
+    pub marathon_goal: Option<u32>,
+    pub sprint_goal: u32,
+    pub ultra_time: u32,
+    pub level_cap: Option<u32>,
+    pub ghost_enabled: bool,
+    pub line_clear_anim_enabled: bool,
+    pub next_count: usize,
 }
 
 impl Game {
-    pub fn new(start_level: u32, mode: GameMode) -> Self {
-        let mut bag = Bag::new();
+    pub fn new(mode: GameMode, settings: &Settings) -> Self {
+        let start_level = match mode {
+            GameMode::Marathon => settings.level,
+            GameMode::Sprint | GameMode::Ultra => 1,
+        };
+        let mut bag = Bag::new(settings.bag_randomizer);
         let current_kind = bag.next();
-        let mut next_queue = Vec::with_capacity(NEXT_COUNT);
-        for _ in 0..NEXT_COUNT {
+        let mut next_queue = Vec::with_capacity(settings.next_count);
+        for _ in 0..settings.next_count {
             next_queue.push(bag.next());
         }
         Self {
@@ -101,6 +112,13 @@ impl Game {
             game_start: Instant::now(),
             elapsed: Duration::ZERO,
             cleared: false,
+            marathon_goal: settings.marathon_goal,
+            sprint_goal: settings.sprint_goal,
+            ultra_time: settings.ultra_time,
+            level_cap: settings.level_cap,
+            ghost_enabled: settings.ghost,
+            line_clear_anim_enabled: settings.line_clear_anim,
+            next_count: settings.next_count,
         }
     }
 
@@ -469,20 +487,27 @@ impl Game {
                 self.back_to_back = false;
             }
 
-            if self.mode == GameMode::Marathon || self.mode == GameMode::Endless {
-                self.level = self.start_level + self.lines / 10;
+            if self.mode == GameMode::Marathon {
+                let new_level = self.start_level + self.lines / 10;
+                self.level = match self.level_cap {
+                    Some(cap) if self.start_level > cap => self.start_level,
+                    Some(cap) => new_level.min(cap),
+                    None => new_level,
+                };
             }
 
-            if (self.mode == GameMode::Marathon && self.lines >= 150)
-                || (self.mode == GameMode::Sprint && self.lines >= 40)
+            if (self.mode == GameMode::Marathon && self.marathon_goal.map_or(false, |g| self.lines >= g))
+                || (self.mode == GameMode::Sprint && self.lines >= self.sprint_goal)
             {
                 self.cleared = true;
-                self.game_over = true;
-                self.remove_rows(&full_rows);
-                return true;
             }
 
-            self.line_clear_anim = Some(LineClearAnimation::new(full_rows));
+            if self.line_clear_anim_enabled {
+                self.line_clear_anim = Some(LineClearAnimation::new(full_rows));
+            } else {
+                self.remove_rows(&full_rows);
+                self.are_timer = Some(Instant::now());
+            }
             return true;
         } else {
             self.combo = -1;
@@ -548,6 +573,10 @@ impl Game {
         if let Some(start) = self.are_timer {
             if start.elapsed() >= ARE_DELAY {
                 self.are_timer = None;
+                if self.cleared {
+                    self.game_over = true;
+                    return true;
+                }
                 self.spawn_next();
                 return true;
             }
@@ -594,7 +623,7 @@ impl Game {
 
     pub fn time_remaining(&self) -> Option<Duration> {
         if self.mode == GameMode::Ultra {
-            Some(Duration::from_secs(120).saturating_sub(self.elapsed))
+            Some(Duration::from_secs(self.ultra_time as u64).saturating_sub(self.elapsed))
         } else {
             None
         }

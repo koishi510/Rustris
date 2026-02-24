@@ -2,6 +2,7 @@ mod audio;
 mod game;
 mod piece;
 mod render;
+mod settings;
 
 use crossterm::{
     cursor,
@@ -14,6 +15,8 @@ use std::time::{Duration, Instant};
 
 use audio::Sfx;
 use game::{Game, GameMode, LastMove, ARE_DELAY, LOCK_DELAY};
+use piece::MAX_NEXT_COUNT;
+use settings::Settings;
 
 const DAS_DELAY: Duration = Duration::from_millis(167);
 const ARR_INTERVAL: Duration = Duration::from_millis(33);
@@ -44,6 +47,7 @@ fn main() -> io::Result<()> {
     let mut stdout = io::stdout();
 
     let mut music = audio::MusicPlayer::new();
+    let mut settings = Settings::default();
 
     terminal::enable_raw_mode()?;
     execute!(
@@ -55,11 +59,14 @@ fn main() -> io::Result<()> {
 
     let result = (|| {
         loop {
-            let (mode, level) = match select_mode(&mut stdout, &mut music)? {
-                Some(ml) => ml,
+            let mode = match select_mode(&mut stdout, &mut music, &mut settings)? {
+                Some(m) => m,
                 None => return Ok(()),
             };
-            run_game(&mut stdout, mode, level, &mut music)?;
+            match run_game(&mut stdout, mode, &mut music, &mut settings)? {
+                true => return Ok(()),  // exit program
+                false => continue,      // back to menu
+            }
         }
     })();
 
@@ -69,98 +76,300 @@ fn main() -> io::Result<()> {
     result
 }
 
-fn select_mode(
-    stdout: &mut io::Stdout,
-    music: &mut Option<audio::MusicPlayer>,
-) -> io::Result<Option<(GameMode, u32)>> {
-    let mut mode = GameMode::Marathon;
-    let mut level: u32 = 1;
-
-    let (bgm_on, sfx_on) = match music {
-        Some(m) => (m.bgm_enabled(), m.sfx_enabled()),
-        None => (false, false),
+fn adjust_setting(settings: &mut Settings, sel: usize, direction: i32, mode: GameMode) {
+    let mc: usize = match mode {
+        GameMode::Marathon => 3,
+        GameMode::Sprint | GameMode::Ultra => 1,
     };
 
-    render::draw_mode_select(stdout, mode, level, bgm_on, sfx_on)?;
+    if sel < mc {
+        // Mode-specific items
+        match mode {
+            GameMode::Marathon => match sel {
+                0 => {
+                    let v = settings.level as i32 + direction;
+                    settings.level = v.clamp(1, 20) as u32;
+                }
+                1 => {
+                    // marathon_goal: Some(10..=300 step 10) or None
+                    match (settings.marathon_goal, direction) {
+                        (Some(g), 1) if g >= 300 => settings.marathon_goal = None,
+                        (Some(g), 1) => settings.marathon_goal = Some((g + 10).min(300)),
+                        (Some(g), -1) => settings.marathon_goal = Some(if g <= 10 { 10 } else { g - 10 }),
+                        (None, -1) => settings.marathon_goal = Some(300),
+                        _ => {}
+                    }
+                }
+                2 => {
+                    // level_cap: Some(1..=20) or None
+                    match (settings.level_cap, direction) {
+                        (Some(c), 1) if c >= 20 => settings.level_cap = None,
+                        (Some(c), 1) => settings.level_cap = Some((c + 1).min(20)),
+                        (Some(c), -1) => settings.level_cap = Some(if c <= 1 { 1 } else { c - 1 }),
+                        (None, -1) => settings.level_cap = Some(20),
+                        _ => {}
+                    }
+                }
+                _ => {}
+            },
+            GameMode::Sprint => {
+                // sel == 0: sprint_goal
+                let v = settings.sprint_goal as i32 + direction * 10;
+                settings.sprint_goal = v.clamp(10, 100) as u32;
+            }
+            GameMode::Ultra => {
+                // sel == 0: ultra_time
+                let v = settings.ultra_time as i32 + direction * 10;
+                settings.ultra_time = v.clamp(30, 300) as u32;
+            }
+        }
+    } else if sel == mc {
+        settings.ghost = !settings.ghost;
+    } else if sel == mc + 1 {
+        settings.line_clear_anim = !settings.line_clear_anim;
+    } else if sel == mc + 2 {
+        let v = settings.next_count as i32 + direction;
+        settings.next_count = v.clamp(1, MAX_NEXT_COUNT as i32) as usize;
+    } else if sel == mc + 3 {
+        settings.bag_randomizer = !settings.bag_randomizer;
+    }
+}
+
+fn run_settings(
+    stdout: &mut io::Stdout,
+    music: &mut Option<audio::MusicPlayer>,
+    settings: &mut Settings,
+    mode: GameMode,
+    in_game: bool,
+) -> io::Result<()> {
+    let mut sel: usize = 0;
+
+    if in_game {
+        // Only BGM(0), SFX(1), Back(2) are interactive
+        let count: usize = 3;
+        loop {
+            let (bgm_on, sfx_on) = match music.as_ref() {
+                Some(m) => (m.bgm_enabled(), m.sfx_enabled()),
+                None => (false, false),
+            };
+            render::draw_settings(stdout, settings, mode, bgm_on, sfx_on, sel, true)?;
+            if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+                match code {
+                    KeyCode::Up => {
+                        sel = sel.checked_sub(1).unwrap_or(count - 1);
+                        if let Some(m) = music.as_ref() {
+                            m.play_sfx(Sfx::MenuMove);
+                        }
+                    }
+                    KeyCode::Down => {
+                        sel = (sel + 1) % count;
+                        if let Some(m) = music.as_ref() {
+                            m.play_sfx(Sfx::MenuMove);
+                        }
+                    }
+                    KeyCode::Enter => match sel {
+                        0 => {
+                            if let Some(m) = music.as_mut() {
+                                m.toggle_bgm();
+                                m.play_sfx(Sfx::Toggle);
+                            }
+                        }
+                        1 => {
+                            if let Some(m) = music.as_mut() {
+                                m.toggle_sfx();
+                                m.play_sfx(Sfx::Toggle);
+                            }
+                        }
+                        2 => {
+                            if let Some(m) = music.as_ref() {
+                                m.play_sfx(Sfx::MenuBack);
+                            }
+                            return Ok(());
+                        }
+                        _ => {}
+                    },
+                    KeyCode::Esc => {
+                        if let Some(m) = music.as_ref() {
+                            m.play_sfx(Sfx::MenuBack);
+                        }
+                        return Ok(());
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    let mc: usize = match mode {
+        GameMode::Marathon => 3,
+        GameMode::Sprint | GameMode::Ultra => 1,
+    };
+    let count = mc + 7;
+    let idx_bgm = mc + 4;
+    let idx_sfx = mc + 5;
+    let idx_back = mc + 6;
+
+    let is_toggle = |s: usize| -> bool {
+        s == mc || s == mc + 1 || s == mc + 3
+    };
 
     loop {
+        let (bgm_on, sfx_on) = match music.as_ref() {
+            Some(m) => (m.bgm_enabled(), m.sfx_enabled()),
+            None => (false, false),
+        };
+        render::draw_settings(stdout, settings, mode, bgm_on, sfx_on, sel, false)?;
         if let Event::Key(KeyEvent { code, .. }) = event::read()? {
             match code {
-                KeyCode::Left => {
-                    mode = match mode {
-                        GameMode::Marathon => GameMode::Endless,
-                        GameMode::Sprint => GameMode::Marathon,
-                        GameMode::Ultra => GameMode::Sprint,
-                        GameMode::Endless => GameMode::Ultra,
-                    };
-                    if let Some(m) = music.as_ref() {
-                        m.play_sfx(Sfx::MenuMove);
-                    }
-                }
-                KeyCode::Right => {
-                    mode = match mode {
-                        GameMode::Marathon => GameMode::Sprint,
-                        GameMode::Sprint => GameMode::Ultra,
-                        GameMode::Ultra => GameMode::Endless,
-                        GameMode::Endless => GameMode::Marathon,
-                    };
-                    if let Some(m) = music.as_ref() {
-                        m.play_sfx(Sfx::MenuMove);
-                    }
-                }
                 KeyCode::Up => {
-                    if (mode == GameMode::Marathon || mode == GameMode::Endless) && level < 20 {
-                        level += 1;
+                    sel = sel.checked_sub(1).unwrap_or(count - 1);
+                    if let Some(m) = music.as_ref() {
+                        m.play_sfx(Sfx::MenuMove);
+                    }
+                }
+                KeyCode::Down => {
+                    sel = (sel + 1) % count;
+                    if let Some(m) = music.as_ref() {
+                        m.play_sfx(Sfx::MenuMove);
+                    }
+                }
+                KeyCode::Left => {
+                    if sel < idx_bgm {
+                        adjust_setting(settings, sel, -1, mode);
                         if let Some(m) = music.as_ref() {
                             m.play_sfx(Sfx::MenuMove);
                         }
                     }
                 }
-                KeyCode::Down => {
-                    if (mode == GameMode::Marathon || mode == GameMode::Endless) && level > 1 {
-                        level -= 1;
+                KeyCode::Right => {
+                    if sel < idx_bgm {
+                        adjust_setting(settings, sel, 1, mode);
                         if let Some(m) = music.as_ref() {
                             m.play_sfx(Sfx::MenuMove);
                         }
                     }
                 }
                 KeyCode::Enter => {
-                    if let Some(m) = music.as_ref() {
-                        m.play_sfx(Sfx::MenuSelect);
+                    if is_toggle(sel) {
+                        adjust_setting(settings, sel, 0, mode);
+                        if let Some(m) = music.as_ref() {
+                            m.play_sfx(Sfx::Toggle);
+                        }
+                    } else if sel == idx_bgm {
+                        if let Some(m) = music.as_mut() {
+                            m.toggle_bgm();
+                            m.play_sfx(Sfx::Toggle);
+                        }
+                    } else if sel == idx_sfx {
+                        if let Some(m) = music.as_mut() {
+                            m.toggle_sfx();
+                            m.play_sfx(Sfx::Toggle);
+                        }
+                    } else if sel == idx_back {
+                        if let Some(m) = music.as_ref() {
+                            m.play_sfx(Sfx::MenuBack);
+                        }
+                        return Ok(());
                     }
-                    let start_level = match mode {
-                        GameMode::Marathon | GameMode::Endless => level,
-                        GameMode::Sprint | GameMode::Ultra => 1,
-                    };
-                    return Ok(Some((mode, start_level)));
                 }
-                KeyCode::Char('h') | KeyCode::Char('H') => {
-                    render::draw_help(stdout)?;
-                    loop {
-                        if let Event::Key(KeyEvent { code: KeyCode::Esc, .. }) = event::read()? {
-                            break;
+                KeyCode::Esc => {
+                    if let Some(m) = music.as_ref() {
+                        m.play_sfx(Sfx::MenuBack);
+                    }
+                    return Ok(());
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+fn select_mode(
+    stdout: &mut io::Stdout,
+    music: &mut Option<audio::MusicPlayer>,
+    settings: &mut Settings,
+) -> io::Result<Option<GameMode>> {
+    let mut mode = GameMode::Marathon;
+    let mut sel: usize = 0;
+    let count: usize = 5; // Mode(0), Start(1), Help(2), Settings(3), Quit(4)
+
+    loop {
+        render::draw_mode_select(stdout, mode, sel)?;
+
+        if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+            match code {
+                KeyCode::Up => {
+                    sel = sel.checked_sub(1).unwrap_or(count - 1);
+                    if let Some(m) = music.as_ref() {
+                        m.play_sfx(Sfx::MenuMove);
+                    }
+                }
+                KeyCode::Down => {
+                    sel = (sel + 1) % count;
+                    if let Some(m) = music.as_ref() {
+                        m.play_sfx(Sfx::MenuMove);
+                    }
+                }
+                KeyCode::Left => {
+                    if sel == 0 {
+                        mode = match mode {
+                            GameMode::Marathon => GameMode::Ultra,
+                            GameMode::Sprint => GameMode::Marathon,
+                            GameMode::Ultra => GameMode::Sprint,
+                        };
+                        if let Some(m) = music.as_ref() {
+                            m.play_sfx(Sfx::MenuMove);
                         }
                     }
                 }
-                KeyCode::Char('m') | KeyCode::Char('M') => {
-                    if let Some(m) = music.as_mut() {
-                        m.toggle_bgm();
+                KeyCode::Right => {
+                    if sel == 0 {
+                        mode = match mode {
+                            GameMode::Marathon => GameMode::Sprint,
+                            GameMode::Sprint => GameMode::Ultra,
+                            GameMode::Ultra => GameMode::Marathon,
+                        };
+                        if let Some(m) = music.as_ref() {
+                            m.play_sfx(Sfx::MenuMove);
+                        }
                     }
                 }
-                KeyCode::Char('n') | KeyCode::Char('N') => {
-                    if let Some(m) = music.as_mut() {
-                        m.toggle_sfx();
+                KeyCode::Enter => {
+                    if sel == 1 {
+                        // Start
+                        if let Some(m) = music.as_ref() {
+                            m.play_sfx(Sfx::MenuSelect);
+                        }
+                        return Ok(Some(mode));
+                    } else if sel == 2 {
+                        // Help
+                        if let Some(m) = music.as_ref() {
+                            m.play_sfx(Sfx::MenuSelect);
+                        }
+                        render::draw_help(stdout, 0)?;
+                        loop {
+                            if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+                                if code == KeyCode::Enter || code == KeyCode::Esc {
+                                    if let Some(m) = music.as_ref() {
+                                        m.play_sfx(Sfx::MenuBack);
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    } else if sel == 3 {
+                        // Settings
+                        if let Some(m) = music.as_ref() {
+                            m.play_sfx(Sfx::MenuSelect);
+                        }
+                        run_settings(stdout, music, settings, mode, false)?;
+                    } else if sel == 4 {
+                        // Quit
+                        return Ok(None);
                     }
                 }
-                KeyCode::Char('q') | KeyCode::Char('Q') => return Ok(None),
-                _ => continue,
+                _ => {}
             }
-
-            let (bgm_on, sfx_on) = match music {
-                Some(m) => (m.bgm_enabled(), m.sfx_enabled()),
-                None => (false, false),
-            };
-            render::draw_mode_select(stdout, mode, level, bgm_on, sfx_on)?;
         }
     }
 }
@@ -208,10 +417,10 @@ fn play_clear_sfx(music: &audio::MusicPlayer, game: &Game, prev_level: u32) {
 fn run_game(
     stdout: &mut io::Stdout,
     mode: GameMode,
-    start_level: u32,
     music: &mut Option<audio::MusicPlayer>,
-) -> io::Result<()> {
-    let mut game = Game::new(start_level, mode);
+    settings: &mut Settings,
+) -> io::Result<bool> {
+    let mut game = Game::new(mode, settings);
     let mut last_tick = Instant::now();
     let mut das: Option<DasState> = None;
     if let Some(m) = music.as_mut() {
@@ -235,27 +444,50 @@ fn run_game(
                     m.play_sfx(Sfx::GameOver);
                 }
             }
-            render::draw_game_over(stdout, &game)?;
+            let mut sel: usize = 0;
+            let count: usize = 3; // Retry, Menu, Quit
             loop {
+                render::draw_game_over(stdout, &game, sel)?;
                 if let Event::Key(KeyEvent { code, .. }) = event::read()? {
                     match code {
-                        KeyCode::Char('q') | KeyCode::Char('Q') => {
+                        KeyCode::Up => {
+                            sel = sel.checked_sub(1).unwrap_or(count - 1);
                             if let Some(m) = music.as_ref() {
-                                m.play_sfx(Sfx::MenuSelect);
+                                m.play_sfx(Sfx::MenuMove);
                             }
-                            return Ok(());
                         }
-                        KeyCode::Char('r') | KeyCode::Char('R') => {
+                        KeyCode::Down => {
+                            sel = (sel + 1) % count;
                             if let Some(m) = music.as_ref() {
-                                m.play_sfx(Sfx::MenuSelect);
+                                m.play_sfx(Sfx::MenuMove);
                             }
-                            break;
                         }
+                        KeyCode::Enter => match sel {
+                            0 => {
+                                // Retry
+                                if let Some(m) = music.as_ref() {
+                                    m.play_sfx(Sfx::MenuSelect);
+                                }
+                                break;
+                            }
+                            1 => {
+                                // Menu
+                                if let Some(m) = music.as_ref() {
+                                    m.play_sfx(Sfx::MenuSelect);
+                                }
+                                return Ok(false);
+                            }
+                            2 => {
+                                // Quit
+                                return Ok(true);
+                            }
+                            _ => {}
+                        },
                         _ => {}
                     }
                 }
             }
-            game = Game::new(start_level, mode);
+            game = Game::new(mode, settings);
             last_tick = Instant::now();
             das = None;
             if let Some(m) = music.as_mut() {
@@ -266,7 +498,7 @@ fn run_game(
         }
 
         game.update_elapsed();
-        if game.mode == GameMode::Ultra && game.elapsed >= Duration::from_secs(120) {
+        if game.mode == GameMode::Ultra && game.elapsed >= Duration::from_secs(game.ultra_time as u64) {
             game.game_over = true;
         }
 
@@ -317,63 +549,89 @@ fn run_game(
         if event::poll(timeout)? {
             if let Event::Key(KeyEvent { code, .. }) = event::read()? {
                 match code {
-                    KeyCode::Esc => {
+                    KeyCode::Esc | KeyCode::Char('p') | KeyCode::Char('P') => {
                         if let Some(m) = music.as_mut() {
                             m.play_sfx(Sfx::Pause);
                             m.pause();
                         }
-                        let (bgm_on, sfx_on) = match music.as_ref() {
-                            Some(m) => (m.bgm_enabled(), m.sfx_enabled()),
-                            None => (false, false),
-                        };
-                        render::draw_pause(stdout, bgm_on, sfx_on)?;
+                        let mut sel: usize = 0;
+                        let count: usize = 6; // Resume,Help,Settings,Retry,Menu,Quit
                         let mut retry = false;
                         loop {
+                            render::draw_pause(stdout, sel)?;
                             if let Event::Key(KeyEvent { code, .. }) = event::read()? {
                                 match code {
-                                    KeyCode::Esc => break,
-                                    KeyCode::Char('q') | KeyCode::Char('Q') => {
-                                        if let Some(m) = music.as_mut() {
-                                            m.stop();
+                                    KeyCode::Up => {
+                                        sel = sel.checked_sub(1).unwrap_or(count - 1);
+                                        if let Some(m) = music.as_ref() {
+                                            m.play_sfx(Sfx::MenuMove);
                                         }
-                                        return Ok(());
                                     }
-                                    KeyCode::Char('r') | KeyCode::Char('R') => {
-                                        retry = true;
-                                        break;
-                                    }
-                                    KeyCode::Char('m') | KeyCode::Char('M') => {
-                                        if let Some(m) = music.as_mut() {
-                                            m.toggle_bgm();
+                                    KeyCode::Down => {
+                                        sel = (sel + 1) % count;
+                                        if let Some(m) = music.as_ref() {
+                                            m.play_sfx(Sfx::MenuMove);
                                         }
-                                        let (bgm_on, sfx_on) = match music.as_ref() {
-                                            Some(m) => (m.bgm_enabled(), m.sfx_enabled()),
-                                            None => (false, false),
-                                        };
-                                        render::draw_pause(stdout, bgm_on, sfx_on)?;
                                     }
-                                    KeyCode::Char('n') | KeyCode::Char('N') => {
-                                        if let Some(m) = music.as_mut() {
-                                            m.toggle_sfx();
+                                    KeyCode::Enter => match sel {
+                                        0 => {
+                                            // Resume
+                                            if let Some(m) = music.as_ref() {
+                                                m.play_sfx(Sfx::Resume);
+                                            }
+                                            break;
                                         }
-                                        let (bgm_on, sfx_on) = match music.as_ref() {
-                                            Some(m) => (m.bgm_enabled(), m.sfx_enabled()),
-                                            None => (false, false),
-                                        };
-                                        render::draw_pause(stdout, bgm_on, sfx_on)?;
-                                    }
-                                    KeyCode::Char('h') | KeyCode::Char('H') => {
-                                        render::draw_help(stdout)?;
-                                        loop {
-                                            if let Event::Key(KeyEvent { code: KeyCode::Esc, .. }) = event::read()? {
-                                                break;
+                                        1 => {
+                                            // Help
+                                            if let Some(m) = music.as_ref() {
+                                                m.play_sfx(Sfx::MenuSelect);
+                                            }
+                                            render::draw_help(stdout, 0)?;
+                                            loop {
+                                                if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+                                                    if code == KeyCode::Enter || code == KeyCode::Esc {
+                                                        if let Some(m) = music.as_ref() {
+                                                            m.play_sfx(Sfx::MenuBack);
+                                                        }
+                                                        break;
+                                                    }
+                                                }
                                             }
                                         }
-                                        let (bgm_on, sfx_on) = match music.as_ref() {
-                                            Some(m) => (m.bgm_enabled(), m.sfx_enabled()),
-                                            None => (false, false),
-                                        };
-                                        render::draw_pause(stdout, bgm_on, sfx_on)?;
+                                        2 => {
+                                            // Settings
+                                            if let Some(m) = music.as_ref() {
+                                                m.play_sfx(Sfx::MenuSelect);
+                                            }
+                                            run_settings(stdout, music, settings, mode, true)?;
+                                        }
+                                        3 => {
+                                            // Retry
+                                            retry = true;
+                                            break;
+                                        }
+                                        4 => {
+                                            // Menu
+                                            if let Some(m) = music.as_mut() {
+                                                m.play_sfx(Sfx::MenuBack);
+                                                m.stop();
+                                            }
+                                            return Ok(false);
+                                        }
+                                        5 => {
+                                            // Quit
+                                            if let Some(m) = music.as_mut() {
+                                                m.stop();
+                                            }
+                                            return Ok(true);
+                                        }
+                                        _ => {}
+                                    },
+                                    KeyCode::Esc | KeyCode::Char('p') | KeyCode::Char('P') => {
+                                        if let Some(m) = music.as_ref() {
+                                            m.play_sfx(Sfx::Resume);
+                                        }
+                                        break;
                                     }
                                     _ => {}
                                 }
@@ -383,7 +641,7 @@ fn run_game(
                             if let Some(m) = music.as_ref() {
                                 m.play_sfx(Sfx::MenuSelect);
                             }
-                            game = Game::new(start_level, mode);
+                            game = Game::new(mode, settings);
                             last_tick = Instant::now();
                             das = None;
                             if let Some(m) = music.as_mut() {
@@ -394,7 +652,6 @@ fn run_game(
                         }
                         if let Some(m) = music.as_mut() {
                             m.resume();
-                            m.play_sfx(Sfx::Resume);
                         }
                         game.reset_game_start();
                         last_tick = Instant::now();
@@ -408,16 +665,6 @@ fn run_game(
                             d.last_arr_move = now;
                         }
                         continue;
-                    }
-                    KeyCode::Char('m') | KeyCode::Char('M') => {
-                        if let Some(m) = music.as_mut() {
-                            m.toggle_bgm();
-                        }
-                    }
-                    KeyCode::Char('n') | KeyCode::Char('N') => {
-                        if let Some(m) = music.as_mut() {
-                            m.toggle_sfx();
-                        }
                     }
                     KeyCode::Left | KeyCode::Right => {
                         let dir = if code == KeyCode::Left { -1 } else { 1 };

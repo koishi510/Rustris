@@ -169,6 +169,8 @@ pub enum Sfx {
     Combo(u32),
     BackToBack,
     Clear,
+    MenuBack,
+    Toggle,
 }
 
 impl Sfx {
@@ -221,6 +223,8 @@ impl Sfx {
                 (784.0, 80), (988.0, 80), (1175.0, 80),
                 (1568.0, 100), (1175.0, 60), (1568.0, 150),
             ],
+            Sfx::MenuBack => vec![(523.0, 30), (392.0, 50)],
+            Sfx::Toggle => vec![(880.0, 20), (1109.0, 25)],
         }
     }
 }

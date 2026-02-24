@@ -1,10 +1,11 @@
 use crossterm::style::Color;
 use rand::seq::SliceRandom;
+use rand::Rng;
 
 pub const BOARD_WIDTH: usize = 10;
 pub const BOARD_HEIGHT: usize = 20;
 pub const EMPTY: u8 = 0;
-pub const NEXT_COUNT: usize = 6;
+pub const MAX_NEXT_COUNT: usize = 6;
 pub const KIND_O: usize = 1;
 pub const KIND_T: usize = 2;
 
@@ -156,14 +157,18 @@ impl Piece {
 
 pub struct Bag {
     queue: Vec<usize>,
+    use_bag: bool,
 }
 
 impl Bag {
-    pub fn new() -> Self {
-        Self { queue: Vec::new() }
+    pub fn new(use_bag: bool) -> Self {
+        Self { queue: Vec::new(), use_bag }
     }
 
     pub fn next(&mut self) -> usize {
+        if !self.use_bag {
+            return rand::thread_rng().gen_range(0..7);
+        }
         if self.queue.is_empty() {
             let mut bag = vec![0, 1, 2, 3, 4, 5, 6];
             bag.shuffle(&mut rand::thread_rng());

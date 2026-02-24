@@ -4,8 +4,58 @@ use std::time::Duration;
 
 use crate::game::{Game, GameMode};
 use crate::piece::*;
+use crate::settings::Settings;
 
 const LEFT_W: usize = 12;
+
+fn centered_line(text: &str, selected: bool, inner_w: usize, dim: bool) -> String {
+    let prefix = if selected { "> " } else { "  " };
+    let prefix_len = prefix.len();
+    // Center the text itself within inner_w; prefix overlaps left padding
+    let total_pad = inner_w.saturating_sub(text.len());
+    let left_pad = total_pad / 2;
+    let right_pad = total_pad - left_pad;
+    let overflow = prefix_len.saturating_sub(left_pad);
+    let line = format!(
+        "{:ls$}{}{}{:rs$}",
+        "", prefix, text, "",
+        ls = left_pad.saturating_sub(prefix_len),
+        rs = right_pad.saturating_sub(overflow),
+    );
+    if dim {
+        format!("{}", line.as_str().with(Color::DarkGrey))
+    } else if selected {
+        format!("{}", line.as_str().with(Color::Yellow))
+    } else {
+        line
+    }
+}
+
+fn menu_item(label: &str, selected: bool, inner_w: usize) -> String {
+    centered_line(label, selected, inner_w, false)
+}
+
+fn menu_toggle(label: &str, on: bool, selected: bool, inner_w: usize) -> String {
+    let state = if on { "ON" } else { "OFF" };
+    let full_label = format!("{}: {}", label, state);
+    centered_line(&full_label, selected, inner_w, false)
+}
+
+fn menu_value(label: &str, value: &str, selected: bool, inner_w: usize) -> String {
+    let full_label = format!("{}: < {} >", label, value);
+    centered_line(&full_label, selected, inner_w, false)
+}
+
+fn menu_toggle_dim(label: &str, on: bool, inner_w: usize) -> String {
+    let state = if on { "ON" } else { "OFF" };
+    let full_label = format!("{}: {}", label, state);
+    centered_line(&full_label, false, inner_w, true)
+}
+
+fn menu_value_dim(label: &str, value: &str, inner_w: usize) -> String {
+    let full_label = format!("{}: {}", label, value);
+    centered_line(&full_label, false, inner_w, true)
+}
 
 fn color_for(id: u8) -> Color {
     PIECE_COLORS[(id - 1) as usize]
@@ -136,12 +186,16 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
         current_cells = [(-1, -1); 4];
         current_color = Color::White;
     } else {
-        let ghost_row = game.ghost_row();
-        ghost_cells = {
-            let mut g = game.current.clone();
-            g.row = ghost_row;
-            g.cells()
-        };
+        if game.ghost_enabled {
+            let ghost_row = game.ghost_row();
+            ghost_cells = {
+                let mut g = game.current.clone();
+                g.row = ghost_row;
+                g.cells()
+            };
+        } else {
+            ghost_cells = [(-1, -1); 4];
+        }
         current_cells = game.current.cells();
         current_color = PIECE_COLORS[game.current.kind];
     }
@@ -164,7 +218,7 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
                 let offset = row - 2;
                 let slot = offset / 3;
                 let in_slot = offset % 3;
-                if slot < NEXT_COUNT && in_slot < 2 {
+                if slot < game.next_count && in_slot < 2 {
                     draw_piece_preview(
                         stdout,
                         game.next_queue[slot],
@@ -222,7 +276,7 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
                 }
             }
             5 => match game.mode {
-                GameMode::Marathon | GameMode::Endless => write!(stdout, "  SCORE: {}", game.score)?,
+                GameMode::Marathon => write!(stdout, "  SCORE: {}", game.score)?,
                 GameMode::Sprint => {
                     let secs = game.elapsed.as_secs();
                     let centis = game.elapsed.subsec_millis() / 10;
@@ -236,25 +290,18 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
                 }
             },
             6 => match game.mode {
-                GameMode::Marathon | GameMode::Endless => write!(stdout, "  LINES: {}", game.lines)?,
-                GameMode::Sprint => {
-                    write!(stdout, "  LINES: {} / 40", game.lines)?;
-                }
+                GameMode::Marathon => match game.marathon_goal {
+                    Some(g) => write!(stdout, "  LINES: {} / {}", game.lines, g)?,
+                    None => write!(stdout, "  LINES: {}", game.lines)?,
+                },
+                GameMode::Sprint => write!(stdout, "  LINES: {} / {}", game.lines, game.sprint_goal)?,
                 GameMode::Ultra => write!(stdout, "  SCORE: {}", game.score)?,
             },
             7 => match game.mode {
-                GameMode::Marathon | GameMode::Endless => write!(stdout, "  LEVEL: {}", game.level)?,
-                GameMode::Sprint => write!(stdout, "  LEVEL: {}", game.level)?,
+                GameMode::Marathon | GameMode::Sprint => write!(stdout, "  LEVEL: {}", game.level)?,
                 GameMode::Ultra => write!(stdout, "  LINES: {}", game.lines)?,
             },
             8 => match game.mode {
-                GameMode::Marathon => {
-                    let goal = 150u32.saturating_sub(game.lines);
-                    write!(stdout, "  GOAL: {}", goal)?;
-                }
-                _ => {}
-            },
-            9 => match game.mode {
                 GameMode::Ultra => write!(stdout, "  LEVEL: {}", game.level)?,
                 _ => {
                     if show_action {
@@ -263,7 +310,7 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
                     }
                 }
             },
-            10 => match game.mode {
+            9 => match game.mode {
                 GameMode::Ultra => {
                     if show_action {
                         let action = game.last_action.as_ref().unwrap();
@@ -277,7 +324,7 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
                     }
                 }
             },
-            11 => {
+            10 => {
                 if game.mode == GameMode::Ultra && show_action {
                     let action = game.last_action.as_ref().unwrap();
                     write!(stdout, "  {}", format!("+{}", action.points).with(Color::Yellow))?;
@@ -338,7 +385,7 @@ fn draw_full_board_overlay(
     Ok(())
 }
 
-pub fn draw_game_over(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
+pub fn draw_game_over(stdout: &mut io::Stdout, game: &Game, selected: usize) -> io::Result<()> {
     execute!(stdout, cursor::MoveTo(0, 0))?;
     draw_title(stdout)?;
 
@@ -346,7 +393,7 @@ pub fn draw_game_over(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
 
     let title = if game.cleared {
         "CLEAR!"
-    } else if game.mode == GameMode::Ultra && game.elapsed >= std::time::Duration::from_secs(120) {
+    } else if game.mode == GameMode::Ultra && game.elapsed >= Duration::from_secs(game.ultra_time as u64) {
         "TIME'S UP!"
     } else {
         "GAME  OVER"
@@ -361,40 +408,38 @@ pub fn draw_game_over(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
     if game.mode == GameMode::Sprint && game.cleared {
         let secs = game.elapsed.as_secs();
         let centis = game.elapsed.subsec_millis() / 10;
-        content.push(Some(format!(
-            "{:^width$}",
-            format!("TIME: {}:{:02}.{:02}", secs / 60, secs % 60, centis),
-            width = inner_w
+        content.push(Some(format!("{:>9}: {:<9}",
+            "TIME", format!("{}:{:02}.{:02}", secs / 60, secs % 60, centis)
         )));
     }
-    content.push(Some(format!("{:^width$}", format!("SCORE: {}", game.score), width = inner_w)));
-    content.push(Some(format!("{:^width$}", format!("LINES: {}", game.lines), width = inner_w)));
-    content.push(Some(format!("{:^width$}", format!("LEVEL: {}", game.level), width = inner_w)));
+    content.push(Some(format!("{:>9}: {:<9}", "SCORE", game.score)));
+    content.push(Some(format!("{:>9}: {:<9}", "LINES", game.lines)));
+    content.push(Some(format!("{:>9}: {:<9}", "LEVEL", game.level)));
     content.push(None);
-    content.push(Some(format!("{:^width$}", "[R] Retry [Q] Quit", width = inner_w)));
+    content.push(Some(menu_item("Retry", selected == 0, inner_w)));
+    content.push(Some(menu_item("Menu", selected == 1, inner_w)));
+    content.push(Some(menu_item("Quit", selected == 2, inner_w)));
     content.push(None);
 
     draw_full_board_overlay(stdout, &content)
 }
 
-pub fn draw_pause(stdout: &mut io::Stdout, bgm_on: bool, sfx_on: bool) -> io::Result<()> {
+pub fn draw_pause(stdout: &mut io::Stdout, selected: usize) -> io::Result<()> {
     execute!(stdout, cursor::MoveTo(0, 0))?;
     draw_title(stdout)?;
 
     let inner_w = BOARD_WIDTH * 2;
-    let bgm_status = if bgm_on { "ON" } else { "OFF" };
-    let sfx_status = if sfx_on { "ON" } else { "OFF" };
 
     let content: Vec<Option<String>> = vec![
         None,
         Some(format!("{:^width$}", "PAUSED", width = inner_w)),
         None,
-        Some(format!("{:^width$}", "[Esc] Resume", width = inner_w)),
-        Some(format!("{:^width$}", "[R] Retry", width = inner_w)),
-        Some(format!("{:^width$}", "[Q] Quit", width = inner_w)),
-        Some(format!("{:^width$}", "[H] Help", width = inner_w)),
-        Some(format!("{:^width$}", format!("[M] BGM: {}", bgm_status), width = inner_w)),
-        Some(format!("{:^width$}", format!("[N] SFX: {}", sfx_status), width = inner_w)),
+        Some(menu_item("Resume", selected == 0, inner_w)),
+        Some(menu_item("Help", selected == 1, inner_w)),
+        Some(menu_item("Settings", selected == 2, inner_w)),
+        Some(menu_item("Retry", selected == 3, inner_w)),
+        Some(menu_item("Menu", selected == 4, inner_w)),
+        Some(menu_item("Quit", selected == 5, inner_w)),
         None,
     ];
 
@@ -404,45 +449,56 @@ pub fn draw_pause(stdout: &mut io::Stdout, bgm_on: bool, sfx_on: bool) -> io::Re
 pub fn draw_mode_select(
     stdout: &mut io::Stdout,
     mode: GameMode,
-    level: u32,
-    bgm_on: bool,
-    sfx_on: bool,
+    selected: usize,
 ) -> io::Result<()> {
     execute!(stdout, cursor::MoveTo(0, 0))?;
     draw_title(stdout)?;
 
     let inner_w = BOARD_WIDTH * 2;
-    let bgm_status = if bgm_on { "ON" } else { "OFF" };
-    let sfx_status = if sfx_on { "ON" } else { "OFF" };
 
     let mode_name = match mode {
         GameMode::Marathon => "Marathon",
         GameMode::Sprint => "Sprint",
         GameMode::Ultra => "Ultra",
-        GameMode::Endless => "Endless",
     };
 
-    let mut content: Vec<Option<String>> = vec![
+    let mode_label = format!("< {} >", mode_name);
+
+    let content: Vec<Option<String>> = vec![
         None,
-        Some(format!("{:^width$}", format!("< {} >", mode_name), width = inner_w)),
+        Some(menu_item(&mode_label, selected == 0, inner_w)),
+        None,
+        Some(menu_item("Start", selected == 1, inner_w)),
+        Some(menu_item("Help", selected == 2, inner_w)),
+        Some(menu_item("Settings", selected == 3, inner_w)),
+        Some(menu_item("Quit", selected == 4, inner_w)),
         None,
     ];
 
-    if mode == GameMode::Marathon || mode == GameMode::Endless {
-        content.push(Some(format!("{:^width$}", format!("Level: < {} >", level), width = inner_w)));
-    }
+    draw_full_board_overlay(stdout, &content)
+}
 
-    content.push(None);
-    content.push(Some(format!("{:^width$}", "←/→ change mode", width = inner_w)));
-    if mode == GameMode::Marathon || mode == GameMode::Endless {
-        content.push(Some(format!("{:^width$}", "↑/↓ change level", width = inner_w)));
-    }
-    content.push(Some(format!("{:^width$}", "[Enter] Start", width = inner_w)));
-    content.push(Some(format!("{:^width$}", "[H] Help", width = inner_w)));
-    content.push(Some(format!("{:^width$}", "[Q] Quit", width = inner_w)));
-    content.push(Some(format!("{:^width$}", format!("[M] BGM: {}", bgm_status), width = inner_w)));
-    content.push(Some(format!("{:^width$}", format!("[N] SFX: {}", sfx_status), width = inner_w)));
-    content.push(None);
+pub fn draw_help(stdout: &mut io::Stdout, selected: usize) -> io::Result<()> {
+    execute!(stdout, cursor::MoveTo(0, 0))?;
+    draw_title(stdout)?;
+
+    let inner_w = BOARD_WIDTH * 2;
+
+    let content: Vec<Option<String>> = vec![
+        None,
+        Some(format!("{:^width$}", "CONTROLS", width = inner_w)),
+        None,
+        Some(format!("{:^width$}", format!("{:>6}  {:<9}", "←/→", "Move"), width = inner_w)),
+        Some(format!("{:^width$}", format!("{:>6}  {:<9}", "↓", "Soft drop"), width = inner_w)),
+        Some(format!("{:^width$}", format!("{:>6}  {:<9}", "Space", "Hard drop"), width = inner_w)),
+        Some(format!("{:^width$}", format!("{:>6}  {:<9}", "↑/X", "Rotate CW"), width = inner_w)),
+        Some(format!("{:^width$}", format!("{:>6}  {:<9}", "Z", "Rotate CCW"), width = inner_w)),
+        Some(format!("{:^width$}", format!("{:>6}  {:<9}", "C", "Hold"), width = inner_w)),
+        Some(format!("{:^width$}", format!("{:>6}  {:<9}", "Esc/P", "Pause"), width = inner_w)),
+        None,
+        Some(menu_item("Back", selected == 0, inner_w)),
+        None,
+    ];
 
     let start_row = (BOARD_HEIGHT - content.len()) / 2;
 
@@ -476,58 +532,98 @@ pub fn draw_mode_select(
     Ok(())
 }
 
-pub fn draw_help(stdout: &mut io::Stdout) -> io::Result<()> {
+pub fn draw_settings(
+    stdout: &mut io::Stdout,
+    settings: &Settings,
+    mode: GameMode,
+    bgm_on: bool,
+    sfx_on: bool,
+    selected: usize,
+    in_game: bool,
+) -> io::Result<()> {
     execute!(stdout, cursor::MoveTo(0, 0))?;
     draw_title(stdout)?;
 
     let inner_w = BOARD_WIDTH * 2;
+    let mc: usize = match mode {
+        GameMode::Marathon => 3,
+        GameMode::Sprint | GameMode::Ultra => 1,
+    };
 
-    let content: Vec<Option<String>> = vec![
-        None,
-        Some(format!("{:^width$}", "CONTROLS", width = inner_w)),
-        None,
-        Some(format!("{:^width$}", "←/→     Move piece", width = inner_w)),
-        Some(format!("{:^width$}", "↓       Soft drop ", width = inner_w)),
-        Some(format!("{:^width$}", "Space   Hard drop ", width = inner_w)),
-        Some(format!("{:^width$}", "↑/X     Rotate CW ", width = inner_w)),
-        Some(format!("{:^width$}", "Z       Rotate CCW", width = inner_w)),
-        Some(format!("{:^width$}", "C       Hold piece", width = inner_w)),
-        Some(format!("{:^width$}", "Esc     Pause     ", width = inner_w)),
-        None,
-        Some(format!("{:^width$}", "[M] BGM  [N] SFX", width = inner_w)),
-        None,
-        Some(format!("{:^width$}", "[Esc] Return", width = inner_w)),
+    let mut content: Vec<Option<String>> = vec![
+        Some(format!("{:^width$}", "SETTINGS", width = inner_w)),
         None,
     ];
 
-    let start_row = (BOARD_HEIGHT - content.len()) / 2;
-
-    write!(stdout, "{:LEFT_W$}╔", "")?;
-    for _ in 0..BOARD_WIDTH {
-        write!(stdout, "══")?;
-    }
-    write!(stdout, "╗\x1b[K\r\n")?;
-
-    for row in 0..BOARD_HEIGHT {
-        write!(stdout, "{:LEFT_W$}║", "")?;
-        if row >= start_row && row - start_row < content.len() {
-            match &content[row - start_row] {
-                Some(text) => write!(stdout, "{}", text)?,
-                None => write!(stdout, "{:width$}", "", width = inner_w)?,
+    if in_game {
+        // Locked mode-specific items (dimmed, no < >)
+        match mode {
+            GameMode::Marathon => {
+                content.push(Some(menu_value_dim("Level", &settings.level.to_string(), inner_w)));
+                let goal_str = match settings.marathon_goal {
+                    Some(g) => g.to_string(),
+                    None => "None".to_string(),
+                };
+                content.push(Some(menu_value_dim("Goal", &goal_str, inner_w)));
+                let cap_str = match settings.level_cap {
+                    Some(c) => c.to_string(),
+                    None => "None".to_string(),
+                };
+                content.push(Some(menu_value_dim("Cap", &cap_str, inner_w)));
             }
-        } else {
-            write!(stdout, "{:width$}", "", width = inner_w)?;
+            GameMode::Sprint => {
+                content.push(Some(menu_value_dim("Goal", &settings.sprint_goal.to_string(), inner_w)));
+            }
+            GameMode::Ultra => {
+                let time_str = format!("{}s", settings.ultra_time);
+                content.push(Some(menu_value_dim("Time", &time_str, inner_w)));
+            }
         }
-        write!(stdout, "║\x1b[K\r\n")?;
+        // Locked common items
+        content.push(Some(menu_toggle_dim("Ghost", settings.ghost, inner_w)));
+        content.push(Some(menu_toggle_dim("Anim", settings.line_clear_anim, inner_w)));
+        content.push(Some(menu_value_dim("Next", &settings.next_count.to_string(), inner_w)));
+        content.push(Some(menu_toggle_dim("Bag", settings.bag_randomizer, inner_w)));
+        content.push(None);
+        // Interactive items: sel 0=BGM, 1=SFX, 2=Back
+        content.push(Some(menu_toggle("BGM", bgm_on, selected == 0, inner_w)));
+        content.push(Some(menu_toggle("SFX", sfx_on, selected == 1, inner_w)));
+        content.push(None);
+        content.push(Some(menu_item("Back", selected == 2, inner_w)));
+    } else {
+        match mode {
+            GameMode::Marathon => {
+                content.push(Some(menu_value("Level", &settings.level.to_string(), selected == 0, inner_w)));
+                let goal_str = match settings.marathon_goal {
+                    Some(g) => g.to_string(),
+                    None => "None".to_string(),
+                };
+                content.push(Some(menu_value("Goal", &goal_str, selected == 1, inner_w)));
+                let cap_str = match settings.level_cap {
+                    Some(c) => c.to_string(),
+                    None => "None".to_string(),
+                };
+                content.push(Some(menu_value("Cap", &cap_str, selected == 2, inner_w)));
+            }
+            GameMode::Sprint => {
+                content.push(Some(menu_value("Goal", &settings.sprint_goal.to_string(), selected == 0, inner_w)));
+            }
+            GameMode::Ultra => {
+                let time_str = format!("{}s", settings.ultra_time);
+                content.push(Some(menu_value("Time", &time_str, selected == 0, inner_w)));
+            }
+        }
+
+        content.push(Some(menu_toggle("Ghost", settings.ghost, selected == mc, inner_w)));
+        content.push(Some(menu_toggle("Anim", settings.line_clear_anim, selected == mc + 1, inner_w)));
+        content.push(Some(menu_value("Next", &settings.next_count.to_string(), selected == mc + 2, inner_w)));
+        content.push(Some(menu_toggle("Bag", settings.bag_randomizer, selected == mc + 3, inner_w)));
+        content.push(None);
+        content.push(Some(menu_toggle("BGM", bgm_on, selected == mc + 4, inner_w)));
+        content.push(Some(menu_toggle("SFX", sfx_on, selected == mc + 5, inner_w)));
+        content.push(None);
+        content.push(Some(menu_item("Back", selected == mc + 6, inner_w)));
     }
 
-    write!(stdout, "{:LEFT_W$}╚", "")?;
-    for _ in 0..BOARD_WIDTH {
-        write!(stdout, "══")?;
-    }
-    write!(stdout, "╝\x1b[K\r\n")?;
-
-    write!(stdout, "\x1b[J")?;
-    stdout.flush()?;
-    Ok(())
+    draw_full_board_overlay(stdout, &content)
 }
