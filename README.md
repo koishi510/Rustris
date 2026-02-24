@@ -5,6 +5,12 @@
 
 A terminal-based Tetris game written in Rust, following the [Tetris Guideline](https://tetris.wiki/Tetris_Guideline).
 
+## Install
+
+```sh
+cargo install rustris
+```
+
 ## Features
 
 - **Super Rotation System (SRS)** with full wall kick tables
@@ -23,11 +29,11 @@ A terminal-based Tetris game written in Rust, following the [Tetris Guideline](h
 
 ## Game Modes
 
-| Mode     | Objective                                |
-| -------- | ---------------------------------------- |
+| Mode     | Objective                                            |
+| -------- | ---------------------------------------------------- |
 | Marathon | Clear a target number of lines (or None for endless) |
-| Sprint   | Clear 40 lines as fast as possible       |
-| Ultra    | Score as high as possible within a time limit |
+| Sprint   | Clear 40 lines as fast as possible                   |
+| Ultra    | Score as high as possible within a time limit        |
 
 ## Controls
 
