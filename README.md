@@ -8,13 +8,26 @@ A terminal-based Tetris game written in Rust, following the [Tetris Guideline](h
 ## Features
 
 - **Super Rotation System (SRS)** with full wall kick tables
-- **7-bag randomizer**
-- **Hold piece** (C key, once per drop)
-- **6-piece next queue** preview
-- **Ghost piece** showing drop destination
-- **Lock delay** (0.5s) with move reset (Infinity)
+- **7-bag randomizer** (or pure random)
+- **Hold piece** (once per drop)
+- **Next queue** preview (1–6 pieces, configurable)
+- **Ghost piece** (toggleable)
+- **Lock delay** (0.5s) with move/rotate reset
+- **DAS/ARR** input handling
+- **Line clear animation** (toggleable)
 - **Guideline scoring**: T-Spin (Mini/Full), Back-to-Back, Combo, All Clear
-- **10 speed levels** with automatic progression
+- **Guideline gravity** with level cap setting
+- **3 game modes**: Marathon, Sprint, Ultra
+- **BGM & SFX** with polyphonic playback
+- **Settings page** with configurable level, goals, timers, and more
+
+## Game Modes
+
+| Mode     | Objective                                |
+| -------- | ---------------------------------------- |
+| Marathon | Clear a target number of lines (or None for endless) |
+| Sprint   | Clear 40 lines as fast as possible       |
+| Ultra    | Score as high as possible within a time limit |
 
 ## Controls
 
@@ -26,9 +39,7 @@ A terminal-based Tetris game written in Rust, following the [Tetris Guideline](h
 | Up / X       | Rotate clockwise         |
 | Z            | Rotate counter-clockwise |
 | C            | Hold piece               |
-| Esc          | Pause / Resume           |
-| R            | Restart (on game over)   |
-| Q            | Quit                     |
+| Esc / P      | Pause                    |
 
 ## Build & Run
 
@@ -42,13 +53,17 @@ cargo run --release
 
 ```
 src/
-  main.rs    - Entry point, terminal setup, game loop
-  game.rs    - Game state, scoring, line clears, lock delay
-  piece.rs   - Piece/Bag structs, SRS data (rotation states, kick tables)
-  render.rs  - Terminal rendering (board, panels, game over overlay)
+  main.rs          - Entry point, game loop, menu/settings input handling
+  game.rs          - Game state, scoring, line clears, lock delay, gravity
+  piece.rs         - Piece/Bag structs, SRS data (rotation states, kick tables)
+  render.rs        - Terminal rendering (board, panels, menus, overlays)
+  audio.rs         - BGM and SFX playback
+  settings.rs      - Settings struct and defaults
+  tetris_notes.rs  - BGM note/melody data
 ```
 
 ## Dependencies
 
 - [crossterm](https://crates.io/crates/crossterm) - Terminal manipulation
-- [rand](https://crates.io/crates/rand) - 7-bag shuffling
+- [rand](https://crates.io/crates/rand) - Bag shuffling and random generation
+- [rodio](https://crates.io/crates/rodio) - Audio playback
