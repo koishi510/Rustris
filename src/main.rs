@@ -64,8 +64,8 @@ fn main() -> io::Result<()> {
                 None => return Ok(()),
             };
             match run_game(&mut stdout, mode, &mut music, &mut settings)? {
-                true => return Ok(()),  // exit program
-                false => continue,      // back to menu
+                true => return Ok(()),
+                false => continue,
             }
         }
     })();
@@ -83,7 +83,6 @@ fn adjust_setting(settings: &mut Settings, sel: usize, direction: i32, mode: Gam
     };
 
     if sel < mc {
-        // Mode-specific items
         match mode {
             GameMode::Marathon => match sel {
                 0 => {
@@ -91,7 +90,6 @@ fn adjust_setting(settings: &mut Settings, sel: usize, direction: i32, mode: Gam
                     settings.level = v.clamp(1, 20) as u32;
                 }
                 1 => {
-                    // marathon_goal: Some(10..=300 step 10) or None
                     match (settings.marathon_goal, direction) {
                         (Some(g), 1) if g >= 300 => settings.marathon_goal = None,
                         (Some(g), 1) => settings.marathon_goal = Some((g + 10).min(300)),
@@ -101,7 +99,6 @@ fn adjust_setting(settings: &mut Settings, sel: usize, direction: i32, mode: Gam
                     }
                 }
                 2 => {
-                    // level_cap: Some(1..=20) or None
                     match (settings.level_cap, direction) {
                         (Some(c), 1) if c >= 20 => settings.level_cap = None,
                         (Some(c), 1) => settings.level_cap = Some((c + 1).min(20)),
@@ -113,23 +110,21 @@ fn adjust_setting(settings: &mut Settings, sel: usize, direction: i32, mode: Gam
                 _ => {}
             },
             GameMode::Sprint => {
-                // sel == 0: sprint_goal
                 let v = settings.sprint_goal as i32 + direction * 10;
                 settings.sprint_goal = v.clamp(10, 100) as u32;
             }
             GameMode::Ultra => {
-                // sel == 0: ultra_time
                 let v = settings.ultra_time as i32 + direction * 10;
                 settings.ultra_time = v.clamp(30, 300) as u32;
             }
         }
     } else if sel == mc {
-        settings.ghost = !settings.ghost;
-    } else if sel == mc + 1 {
-        settings.line_clear_anim = !settings.line_clear_anim;
-    } else if sel == mc + 2 {
         let v = settings.next_count as i32 + direction;
         settings.next_count = v.clamp(1, MAX_NEXT_COUNT as i32) as usize;
+    } else if sel == mc + 1 {
+        settings.ghost = !settings.ghost;
+    } else if sel == mc + 2 {
+        settings.line_clear_anim = !settings.line_clear_anim;
     } else if sel == mc + 3 {
         settings.bag_randomizer = !settings.bag_randomizer;
     }
@@ -145,7 +140,6 @@ fn run_settings(
     let mut sel: usize = 0;
 
     if in_game {
-        // Only BGM(0), SFX(1), Back(2) are interactive
         let count: usize = 3;
         loop {
             let (bgm_on, sfx_on) = match music.as_ref() {
@@ -210,7 +204,7 @@ fn run_settings(
     let idx_back = mc + 6;
 
     let is_toggle = |s: usize| -> bool {
-        s == mc || s == mc + 1 || s == mc + 3
+        s == mc + 1 || s == mc + 2 || s == mc + 3
     };
 
     loop {
@@ -291,7 +285,7 @@ fn select_mode(
 ) -> io::Result<Option<GameMode>> {
     let mut mode = GameMode::Marathon;
     let mut sel: usize = 0;
-    let count: usize = 5; // Mode(0), Start(1), Help(2), Settings(3), Quit(4)
+    let count: usize = 5;
 
     loop {
         render::draw_mode_select(stdout, mode, sel)?;
@@ -336,13 +330,16 @@ fn select_mode(
                 }
                 KeyCode::Enter => {
                     if sel == 1 {
-                        // Start
                         if let Some(m) = music.as_ref() {
                             m.play_sfx(Sfx::MenuSelect);
                         }
                         return Ok(Some(mode));
                     } else if sel == 2 {
-                        // Help
+                        if let Some(m) = music.as_ref() {
+                            m.play_sfx(Sfx::MenuSelect);
+                        }
+                        run_settings(stdout, music, settings, mode, false)?;
+                    } else if sel == 3 {
                         if let Some(m) = music.as_ref() {
                             m.play_sfx(Sfx::MenuSelect);
                         }
@@ -357,14 +354,7 @@ fn select_mode(
                                 }
                             }
                         }
-                    } else if sel == 3 {
-                        // Settings
-                        if let Some(m) = music.as_ref() {
-                            m.play_sfx(Sfx::MenuSelect);
-                        }
-                        run_settings(stdout, music, settings, mode, false)?;
                     } else if sel == 4 {
-                        // Quit
                         return Ok(None);
                     }
                 }
@@ -445,7 +435,7 @@ fn run_game(
                 }
             }
             let mut sel: usize = 0;
-            let count: usize = 3; // Retry, Menu, Quit
+            let count: usize = 3;
             loop {
                 render::draw_game_over(stdout, &game, sel)?;
                 if let Event::Key(KeyEvent { code, .. }) = event::read()? {
@@ -464,21 +454,18 @@ fn run_game(
                         }
                         KeyCode::Enter => match sel {
                             0 => {
-                                // Retry
                                 if let Some(m) = music.as_ref() {
                                     m.play_sfx(Sfx::MenuSelect);
                                 }
                                 break;
                             }
                             1 => {
-                                // Menu
                                 if let Some(m) = music.as_ref() {
                                     m.play_sfx(Sfx::MenuSelect);
                                 }
                                 return Ok(false);
                             }
                             2 => {
-                                // Quit
                                 return Ok(true);
                             }
                             _ => {}
@@ -546,6 +533,10 @@ fn run_game(
             timeout = timeout.min(remaining);
         }
 
+        if game.mode == GameMode::Sprint || game.mode == GameMode::Ultra {
+            timeout = timeout.min(Duration::from_millis(32));
+        }
+
         if event::poll(timeout)? {
             if let Event::Key(KeyEvent { code, .. }) = event::read()? {
                 match code {
@@ -555,7 +546,7 @@ fn run_game(
                             m.pause();
                         }
                         let mut sel: usize = 0;
-                        let count: usize = 6; // Resume,Help,Settings,Retry,Menu,Quit
+                        let count: usize = 6;
                         let mut retry = false;
                         loop {
                             render::draw_pause(stdout, sel)?;
@@ -575,14 +566,18 @@ fn run_game(
                                     }
                                     KeyCode::Enter => match sel {
                                         0 => {
-                                            // Resume
                                             if let Some(m) = music.as_ref() {
                                                 m.play_sfx(Sfx::Resume);
                                             }
                                             break;
                                         }
                                         1 => {
-                                            // Help
+                                            if let Some(m) = music.as_ref() {
+                                                m.play_sfx(Sfx::MenuSelect);
+                                            }
+                                            run_settings(stdout, music, settings, mode, true)?;
+                                        }
+                                        2 => {
                                             if let Some(m) = music.as_ref() {
                                                 m.play_sfx(Sfx::MenuSelect);
                                             }
@@ -598,20 +593,11 @@ fn run_game(
                                                 }
                                             }
                                         }
-                                        2 => {
-                                            // Settings
-                                            if let Some(m) = music.as_ref() {
-                                                m.play_sfx(Sfx::MenuSelect);
-                                            }
-                                            run_settings(stdout, music, settings, mode, true)?;
-                                        }
                                         3 => {
-                                            // Retry
                                             retry = true;
                                             break;
                                         }
                                         4 => {
-                                            // Menu
                                             if let Some(m) = music.as_mut() {
                                                 m.play_sfx(Sfx::MenuBack);
                                                 m.stop();
@@ -619,7 +605,6 @@ fn run_game(
                                             return Ok(false);
                                         }
                                         5 => {
-                                            // Quit
                                             if let Some(m) = music.as_mut() {
                                                 m.stop();
                                             }
@@ -766,7 +751,7 @@ fn run_game(
                     }
                 }
             }
-            continue; // Skip gravity/lock during ARE
+            continue;
         }
 
         if let Some(lock_start) = game.lock_delay {

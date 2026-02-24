@@ -11,7 +11,6 @@ const LEFT_W: usize = 12;
 fn centered_line(text: &str, selected: bool, inner_w: usize, dim: bool) -> String {
     let prefix = if selected { "> " } else { "  " };
     let prefix_len = prefix.len();
-    // Center the text itself within inner_w; prefix overlaps left padding
     let total_pad = inner_w.saturating_sub(text.len());
     let left_pad = total_pad / 2;
     let right_pad = total_pad - left_pad;
@@ -35,26 +34,26 @@ fn menu_item(label: &str, selected: bool, inner_w: usize) -> String {
     centered_line(label, selected, inner_w, false)
 }
 
-fn menu_toggle(label: &str, on: bool, selected: bool, inner_w: usize) -> String {
+fn settings_value(label: &str, value: &str, selected: bool, inner_w: usize) -> String {
+    let formatted = format!("{:>5}: < {:^4} >", label, value);
+    centered_line(&formatted, selected, inner_w, false)
+}
+
+fn settings_toggle(label: &str, on: bool, selected: bool, inner_w: usize) -> String {
     let state = if on { "ON" } else { "OFF" };
-    let full_label = format!("{}: {}", label, state);
-    centered_line(&full_label, selected, inner_w, false)
+    let formatted = format!("{:>5}: {:<8}", label, state);
+    centered_line(&formatted, selected, inner_w, false)
 }
 
-fn menu_value(label: &str, value: &str, selected: bool, inner_w: usize) -> String {
-    let full_label = format!("{}: < {} >", label, value);
-    centered_line(&full_label, selected, inner_w, false)
+fn settings_value_dim(label: &str, value: &str, inner_w: usize) -> String {
+    let formatted = format!("{:>5}: {:<8}", label, value);
+    centered_line(&formatted, false, inner_w, true)
 }
 
-fn menu_toggle_dim(label: &str, on: bool, inner_w: usize) -> String {
+fn settings_toggle_dim(label: &str, on: bool, inner_w: usize) -> String {
     let state = if on { "ON" } else { "OFF" };
-    let full_label = format!("{}: {}", label, state);
-    centered_line(&full_label, false, inner_w, true)
-}
-
-fn menu_value_dim(label: &str, value: &str, inner_w: usize) -> String {
-    let full_label = format!("{}: {}", label, value);
-    centered_line(&full_label, false, inner_w, true)
+    let formatted = format!("{:>5}: {:<8}", label, state);
+    centered_line(&formatted, false, inner_w, true)
 }
 
 fn color_for(id: u8) -> Color {
@@ -234,7 +233,6 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
             }
         }
 
-        // Board
         write!(stdout, "║")?;
         for col in 0..BOARD_WIDTH {
             if anim_rows.contains(&row) {
@@ -259,7 +257,6 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
             }
         }
 
-        // Right panel
         write!(stdout, "║")?;
         match row {
             0 => {
@@ -285,7 +282,8 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
                 GameMode::Ultra => {
                     if let Some(rem) = game.time_remaining() {
                         let secs = rem.as_secs();
-                        write!(stdout, "  TIME: {}:{:02}", secs / 60, secs % 60)?;
+                        let centis = rem.subsec_millis() / 10;
+                        write!(stdout, "  TIME: {}:{:02}.{:02}", secs / 60, secs % 60, centis)?;
                     }
                 }
             },
@@ -435,8 +433,8 @@ pub fn draw_pause(stdout: &mut io::Stdout, selected: usize) -> io::Result<()> {
         Some(format!("{:^width$}", "PAUSED", width = inner_w)),
         None,
         Some(menu_item("Resume", selected == 0, inner_w)),
-        Some(menu_item("Help", selected == 1, inner_w)),
-        Some(menu_item("Settings", selected == 2, inner_w)),
+        Some(menu_item("Settings", selected == 1, inner_w)),
+        Some(menu_item("Help", selected == 2, inner_w)),
         Some(menu_item("Retry", selected == 3, inner_w)),
         Some(menu_item("Menu", selected == 4, inner_w)),
         Some(menu_item("Quit", selected == 5, inner_w)),
@@ -462,15 +460,15 @@ pub fn draw_mode_select(
         GameMode::Ultra => "Ultra",
     };
 
-    let mode_label = format!("< {} >", mode_name);
+    let mode_label = format!("< {:^8} >", mode_name);
 
     let content: Vec<Option<String>> = vec![
         None,
         Some(menu_item(&mode_label, selected == 0, inner_w)),
         None,
         Some(menu_item("Start", selected == 1, inner_w)),
-        Some(menu_item("Help", selected == 2, inner_w)),
-        Some(menu_item("Settings", selected == 3, inner_w)),
+        Some(menu_item("Settings", selected == 2, inner_w)),
+        Some(menu_item("Help", selected == 3, inner_w)),
         Some(menu_item("Quit", selected == 4, inner_w)),
         None,
     ];
@@ -556,71 +554,68 @@ pub fn draw_settings(
     ];
 
     if in_game {
-        // Locked mode-specific items (dimmed, no < >)
         match mode {
             GameMode::Marathon => {
-                content.push(Some(menu_value_dim("Level", &settings.level.to_string(), inner_w)));
+                content.push(Some(settings_value_dim("Level", &settings.level.to_string(), inner_w)));
                 let goal_str = match settings.marathon_goal {
                     Some(g) => g.to_string(),
                     None => "None".to_string(),
                 };
-                content.push(Some(menu_value_dim("Goal", &goal_str, inner_w)));
+                content.push(Some(settings_value_dim("Goal", &goal_str, inner_w)));
                 let cap_str = match settings.level_cap {
                     Some(c) => c.to_string(),
                     None => "None".to_string(),
                 };
-                content.push(Some(menu_value_dim("Cap", &cap_str, inner_w)));
+                content.push(Some(settings_value_dim("Cap", &cap_str, inner_w)));
             }
             GameMode::Sprint => {
-                content.push(Some(menu_value_dim("Goal", &settings.sprint_goal.to_string(), inner_w)));
+                content.push(Some(settings_value_dim("Goal", &settings.sprint_goal.to_string(), inner_w)));
             }
             GameMode::Ultra => {
                 let time_str = format!("{}s", settings.ultra_time);
-                content.push(Some(menu_value_dim("Time", &time_str, inner_w)));
+                content.push(Some(settings_value_dim("Time", &time_str, inner_w)));
             }
         }
-        // Locked common items
-        content.push(Some(menu_toggle_dim("Ghost", settings.ghost, inner_w)));
-        content.push(Some(menu_toggle_dim("Anim", settings.line_clear_anim, inner_w)));
-        content.push(Some(menu_value_dim("Next", &settings.next_count.to_string(), inner_w)));
-        content.push(Some(menu_toggle_dim("Bag", settings.bag_randomizer, inner_w)));
+        content.push(Some(settings_value_dim("Next", &settings.next_count.to_string(), inner_w)));
+        content.push(Some(settings_toggle_dim("Ghost", settings.ghost, inner_w)));
+        content.push(Some(settings_toggle_dim("Anim", settings.line_clear_anim, inner_w)));
+        content.push(Some(settings_toggle_dim("Bag", settings.bag_randomizer, inner_w)));
         content.push(None);
-        // Interactive items: sel 0=BGM, 1=SFX, 2=Back
-        content.push(Some(menu_toggle("BGM", bgm_on, selected == 0, inner_w)));
-        content.push(Some(menu_toggle("SFX", sfx_on, selected == 1, inner_w)));
+        content.push(Some(settings_toggle("BGM", bgm_on, selected == 0, inner_w)));
+        content.push(Some(settings_toggle("SFX", sfx_on, selected == 1, inner_w)));
         content.push(None);
         content.push(Some(menu_item("Back", selected == 2, inner_w)));
     } else {
         match mode {
             GameMode::Marathon => {
-                content.push(Some(menu_value("Level", &settings.level.to_string(), selected == 0, inner_w)));
+                content.push(Some(settings_value("Level", &settings.level.to_string(), selected == 0, inner_w)));
                 let goal_str = match settings.marathon_goal {
                     Some(g) => g.to_string(),
                     None => "None".to_string(),
                 };
-                content.push(Some(menu_value("Goal", &goal_str, selected == 1, inner_w)));
+                content.push(Some(settings_value("Goal", &goal_str, selected == 1, inner_w)));
                 let cap_str = match settings.level_cap {
                     Some(c) => c.to_string(),
                     None => "None".to_string(),
                 };
-                content.push(Some(menu_value("Cap", &cap_str, selected == 2, inner_w)));
+                content.push(Some(settings_value("Cap", &cap_str, selected == 2, inner_w)));
             }
             GameMode::Sprint => {
-                content.push(Some(menu_value("Goal", &settings.sprint_goal.to_string(), selected == 0, inner_w)));
+                content.push(Some(settings_value("Goal", &settings.sprint_goal.to_string(), selected == 0, inner_w)));
             }
             GameMode::Ultra => {
                 let time_str = format!("{}s", settings.ultra_time);
-                content.push(Some(menu_value("Time", &time_str, selected == 0, inner_w)));
+                content.push(Some(settings_value("Time", &time_str, selected == 0, inner_w)));
             }
         }
 
-        content.push(Some(menu_toggle("Ghost", settings.ghost, selected == mc, inner_w)));
-        content.push(Some(menu_toggle("Anim", settings.line_clear_anim, selected == mc + 1, inner_w)));
-        content.push(Some(menu_value("Next", &settings.next_count.to_string(), selected == mc + 2, inner_w)));
-        content.push(Some(menu_toggle("Bag", settings.bag_randomizer, selected == mc + 3, inner_w)));
+        content.push(Some(settings_value("Next", &settings.next_count.to_string(), selected == mc, inner_w)));
+        content.push(Some(settings_toggle("Ghost", settings.ghost, selected == mc + 1, inner_w)));
+        content.push(Some(settings_toggle("Anim", settings.line_clear_anim, selected == mc + 2, inner_w)));
+        content.push(Some(settings_toggle("Bag", settings.bag_randomizer, selected == mc + 3, inner_w)));
         content.push(None);
-        content.push(Some(menu_toggle("BGM", bgm_on, selected == mc + 4, inner_w)));
-        content.push(Some(menu_toggle("SFX", sfx_on, selected == mc + 5, inner_w)));
+        content.push(Some(settings_toggle("BGM", bgm_on, selected == mc + 4, inner_w)));
+        content.push(Some(settings_toggle("SFX", sfx_on, selected == mc + 5, inner_w)));
         content.push(None);
         content.push(Some(menu_item("Back", selected == mc + 6, inner_w)));
     }
