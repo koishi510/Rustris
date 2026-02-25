@@ -1,9 +1,9 @@
 # Rustris
 
-[![Build](https://img.shields.io/github/actions/workflow/status/koishi510/Rustris/rust.yml?branch=main&style=flat-square&logo=github)](https://github.com/koishi510/Rustris/actions/workflows/rust.yml)
+[![Build](https://img.shields.io/github/actions/workflow/status/koishi510/Rustris/rust.yml?branch=main&style=flat-square)](https://github.com/koishi510/Rustris/actions/workflows/rust.yml)
 [![Release](https://img.shields.io/github/v/release/koishi510/Rustris?style=flat-square)](https://github.com/koishi510/Rustris/releases)
-[![Rust](https://img.shields.io/badge/Rust-2024_edition-orange?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-GPL--3.0-green?style=flat-square)](./LICENSE)
+[![MSRV](https://img.shields.io/badge/MSRV-1.85-orange?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 
 A guideline-compliant terminal Tetris written in Rust.
 
@@ -25,24 +25,24 @@ cargo run --release
 
 ## Game Modes
 
-| Mode | Objective |
-| --- | --- |
-| Marathon | Clear a target number of lines (default 150) |
-| Sprint | Clear lines (default 40) as fast as possible |
-| Ultra | Score as high as possible within a time limit (default 120s) |
-| Endless | Play with no goal until game over |
+| Mode     | Objective                                                    |
+| -------- | ------------------------------------------------------------ |
+| Marathon | Clear a target number of lines (default 150)                 |
+| Sprint   | Clear lines (default 40) as fast as possible                 |
+| Ultra    | Score as high as possible within a time limit (default 120s) |
+| Endless  | Play with no goal until game over                            |
 
 ## Controls
 
-| Key | Action |
-| --- | --- |
-| Left / Right | Move piece |
-| Down | Soft drop (+1 per cell) |
-| Space | Hard drop (+2 per cell) |
-| Up / X | Rotate clockwise |
-| Z | Rotate counter-clockwise |
-| C | Hold piece |
-| Esc / P | Pause |
+| Key          | Action                   |
+| ------------ | ------------------------ |
+| Left / Right | Move piece               |
+| Down         | Soft drop (+1 per cell)  |
+| Space        | Hard drop (+2 per cell)  |
+| Up / X       | Rotate clockwise         |
+| Z            | Rotate counter-clockwise |
+| C            | Hold piece               |
+| Esc / P      | Pause                    |
 
 ## Features
 
@@ -63,13 +63,13 @@ cargo run --release
 
 Each mode has its own configurable parameters:
 
-| Setting | Modes | Range |
-| --- | --- | --- |
-| Level | Marathon, Endless | 1-20 |
-| Goal | Marathon | 10-300 (step 10) |
-| Goal | Sprint | 10-100 (step 10) |
-| Time | Ultra | 30-300s (step 10) |
-| Level Cap | Marathon, Endless | 1-20 or None |
+| Setting   | Modes             | Range             |
+| --------- | ----------------- | ----------------- |
+| Level     | Marathon, Endless | 1-20              |
+| Goal      | Marathon          | 10-300 (step 10)  |
+| Goal      | Sprint            | 10-100 (step 10)  |
+| Time      | Ultra             | 30-300s (step 10) |
+| Level Cap | Marathon, Endless | 1-20 or None      |
 
 Shared settings: Next count, Ghost, Line clear animation, Bag randomizer, BGM, SFX.
 
