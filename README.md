@@ -1,9 +1,10 @@
 # Rustris
 
-[![Rust](https://img.shields.io/badge/Rust-2024_edition-orange?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![License](https://img.shields.io/badge/license-GPL--3.0-green?style=for-the-badge)](./LICENSE)
+[![Rust](https://github.com/koishi510/Rustris/actions/workflows/rust.yml/badge.svg)](https://github.com/koishi510/Rustris/actions/workflows/rust.yml)
+[![Rust](https://img.shields.io/badge/Rust-2024_edition-orange?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![License](https://img.shields.io/badge/license-GPL--3.0-green?style=flat-square)](./LICENSE)
 
-A terminal-based Tetris game written in Rust, following the [Tetris Guideline](https://tetris.wiki/Tetris_Guideline).
+A guideline-compliant terminal Tetris written in Rust.
 
 ## Install
 
@@ -11,61 +12,78 @@ A terminal-based Tetris game written in Rust, following the [Tetris Guideline](h
 cargo install rustris
 ```
 
+Or build from source:
+
+```sh
+git clone https://github.com/koishi510/Rustris.git
+cd Rustris
+cargo run --release
+```
+
+> Requires Rust 2024 edition (1.85+). On Linux, `libasound2-dev` (or equivalent) is needed for audio support.
+
+## Game Modes
+
+| Mode | Objective |
+| --- | --- |
+| Marathon | Clear a target number of lines (default 150) |
+| Sprint | Clear lines (default 40) as fast as possible |
+| Ultra | Score as high as possible within a time limit (default 120s) |
+| Endless | Play with no goal until game over |
+
+## Controls
+
+| Key | Action |
+| --- | --- |
+| Left / Right | Move piece |
+| Down | Soft drop (+1 per cell) |
+| Space | Hard drop (+2 per cell) |
+| Up / X | Rotate clockwise |
+| Z | Rotate counter-clockwise |
+| C | Hold piece |
+| Esc / P | Pause |
+
 ## Features
 
 - **Super Rotation System (SRS)** with full wall kick tables
 - **7-bag randomizer** (or pure random)
 - **Hold piece** (once per drop)
-- **Next queue** preview (1–6 pieces, configurable)
+- **Next queue** preview (1-6 pieces, configurable)
 - **Ghost piece** (toggleable)
 - **Lock delay** (0.5s) with move/rotate reset
 - **DAS/ARR** input handling
 - **Line clear animation** (toggleable)
-- **Guideline scoring**: T-Spin (Mini/Full), Back-to-Back, Combo, All Clear
+- **Guideline scoring** - T-Spin (Mini/Full), Back-to-Back, Combo, All Clear
 - **Guideline gravity** with level cap setting
-- **3 game modes**: Marathon, Sprint, Ultra
 - **BGM & SFX** with polyphonic playback
-- **Settings page** with configurable level, goals, timers, and more
+- **Leaderboard** - top 10 per mode, recorded only under default settings
 
-## Game Modes
+## Settings
 
-| Mode     | Objective                                            |
-| -------- | ---------------------------------------------------- |
-| Marathon | Clear a target number of lines (or None for endless) |
-| Sprint   | Clear 40 lines as fast as possible                   |
-| Ultra    | Score as high as possible within a time limit        |
+Each mode has its own configurable parameters:
 
-## Controls
+| Setting | Modes | Range |
+| --- | --- | --- |
+| Level | Marathon, Endless | 1-20 |
+| Goal | Marathon | 10-300 (step 10) |
+| Goal | Sprint | 10-100 (step 10) |
+| Time | Ultra | 30-300s (step 10) |
+| Level Cap | Marathon, Endless | 1-20 or None |
 
-| Key          | Action                   |
-| ------------ | ------------------------ |
-| Left / Right | Move piece               |
-| Down         | Soft drop (+1 per cell)  |
-| Space        | Hard drop (+2 per cell)  |
-| Up / X       | Rotate clockwise         |
-| Z            | Rotate counter-clockwise |
-| C            | Hold piece               |
-| Esc / P      | Pause                    |
-
-## Build & Run
-
-Requires Rust 2024 edition (1.85+).
-
-```sh
-cargo run --release
-```
+Shared settings: Next count, Ghost, Line clear animation, Bag randomizer, BGM, SFX.
 
 ## Project Structure
 
 ```
 src/
-  main.rs          - Entry point, game loop, menu/settings input handling
-  game.rs          - Game state, scoring, line clears, lock delay, gravity
-  piece.rs         - Piece/Bag structs, SRS data (rotation states, kick tables)
-  render.rs        - Terminal rendering (board, panels, menus, overlays)
-  audio.rs         - BGM and SFX playback
-  settings.rs      - Settings struct and defaults
-  tetris_notes.rs  - BGM note/melody data
+  main.rs          Entry point, game loop, menu and input handling
+  game.rs          Game state, scoring, line clears, lock delay, gravity
+  piece.rs         Piece/Bag structs, SRS data (rotation states, kick tables)
+  render.rs        Terminal rendering (board, panels, menus, overlays)
+  records.rs       Leaderboard persistence (JSON via serde)
+  audio.rs         BGM and SFX playback
+  settings.rs      Settings struct and defaults
+  tetris_notes.rs  BGM note/melody data
 ```
 
 ## Dependencies
@@ -73,3 +91,9 @@ src/
 - [crossterm](https://crates.io/crates/crossterm) - Terminal manipulation
 - [rand](https://crates.io/crates/rand) - Bag shuffling and random generation
 - [rodio](https://crates.io/crates/rodio) - Audio playback
+- [serde](https://crates.io/crates/serde) / [serde_json](https://crates.io/crates/serde_json) - Record serialization
+- [dirs](https://crates.io/crates/dirs) - Platform data directory resolution
+
+## License
+
+[GPL-3.0](./LICENSE)
