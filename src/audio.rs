@@ -42,7 +42,7 @@ const DUTY_CYCLE: f32 = 0.25;
 
 const SFX_AMPLITUDE: f32 = 0.35;
 
-include!("tetris_notes.rs");
+include!("bgm_score.rs");
 
 const TOTAL_BEATS: f32 = 512.0;
 

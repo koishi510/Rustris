@@ -78,14 +78,22 @@ Shared settings: Next count, Ghost, Line clear animation, Bag randomizer, BGM, S
 
 ```
 src/
-  main.rs          Entry point, game loop, menu and input handling
-  game.rs          Game state, scoring, line clears, lock delay, gravity
-  piece.rs         Piece/Bag structs, SRS data (rotation states, kick tables)
-  render.rs        Terminal rendering (board, panels, menus, overlays)
-  records.rs       Leaderboard persistence (JSON via serde)
-  audio.rs         BGM and SFX playback
-  settings.rs      Settings struct and defaults
-  tetris_notes.rs  BGM note/melody data
+  main.rs            Entry point, terminal init/cleanup
+  ui/
+    menus.rs         Mode select, settings, records screens
+    game_loop.rs     Game loop, DAS input, SFX dispatch
+  game/
+    types.rs         GameMode, LastMove, ClearAction, timing constants
+    mod.rs           Game struct and all gameplay logic
+  render/
+    board.rs         Main board rendering
+    menus.rs         Menu/overlay rendering (pause, game over, settings, etc.)
+    mod.rs           Shared render utilities, title, piece preview
+  piece.rs           Piece/Bag structs, SRS data (rotation states, kick tables)
+  records.rs         Leaderboard persistence (JSON via serde)
+  audio.rs           BGM and SFX playback
+  settings.rs        Settings struct and defaults
+  bgm_score.rs       BGM note/melody data
 ```
 
 ## Dependencies
