@@ -149,7 +149,6 @@ impl Game {
             return (false, false);
         }
 
-        // Full T-Spin if both front corners occupied, otherwise Mini
         if front_occupied == 2 {
             (true, false)
         } else {
@@ -294,7 +293,6 @@ impl Game {
                 }
             }
         } else {
-            // No SRS: try basic rotation without wall kicks
             let mut test = self.current.clone();
             test.rotation = new_rotation;
             if self.fits(&test) {
@@ -598,7 +596,6 @@ impl Game {
         }
     }
 
-    /// Guideline gravity: time_per_row = (0.8 - (level-1)*0.007)^(level-1). Capped at 20G.
     pub fn gravity(&self) -> f64 {
         let lvl = self.level as f64;
         let time_per_row = (0.8 - (lvl - 1.0) * 0.007).powf(lvl - 1.0);

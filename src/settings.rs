@@ -2,19 +2,19 @@ use crate::piece::MAX_NEXT_COUNT;
 
 #[derive(Clone, Copy)]
 pub struct Settings {
-    pub level: u32,                // 1..=20
-    pub marathon_goal: u32,         // 10..=300, step 10
-    pub sprint_goal: u32,          // 10..=100, step 10
-    pub ultra_time: u32,           // 30..=300, step 10 (seconds)
-    pub level_cap: Option<u32>,    // Some(1..=20) or None (no cap)
+    pub level: u32,
+    pub marathon_goal: u32,
+    pub sprint_goal: u32,
+    pub ultra_time: u32,
+    pub level_cap: Option<u32>,
     pub ghost: bool,
     pub line_clear_anim: bool,
-    pub next_count: usize,         // 1..=MAX_NEXT_COUNT
-    pub bag_randomizer: bool,      // true=7-bag, false=pure random
-    pub srs: bool,                 // true=SRS with wall kicks
+    pub next_count: usize,
+    pub bag_randomizer: bool,
+    pub srs: bool,
     pub hold_enabled: bool,
-    pub lock_delay_ms: u32,        // 0..=2000, step 100 (milliseconds)
-    pub move_reset: Option<u32>,   // Some(1..=30) or None (unlimited)
+    pub lock_delay_ms: u32,
+    pub move_reset: Option<u32>,
 }
 
 impl Default for Settings {

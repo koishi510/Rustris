@@ -50,7 +50,6 @@ fn iso8601_now() -> String {
     let minutes = (time_of_day % 3600) / 60;
     let seconds = time_of_day % 60;
 
-    // Days since epoch to Y-M-D (simplified leap year calculation)
     let mut y = 1970i64;
     let mut remaining = days as i64;
     loop {
@@ -98,7 +97,6 @@ fn play_clear_sfx(music: &audio::MusicPlayer, game: &Game, prev_level: u32) {
         let lines = anim.rows.len() as u32;
         if let Some(action) = &game.last_action {
             let label = &action.label;
-            // Priority from low to high (last call wins)
             if label.contains("T-Spin") || label.contains("Mini T-Spin") {
                 music.play_sfx(Sfx::TSpinClear(lines));
             } else {
@@ -141,6 +139,8 @@ pub fn run_game(
     let mut game = Game::new(mode, settings);
     let mut last_tick = Instant::now();
     let mut das: Option<DasState> = None;
+    let mut irs: Option<i32> = None;
+    let mut ihs: bool = false;
     if let Some(m) = music.as_mut() {
         m.play();
     }
@@ -229,6 +229,8 @@ pub fn run_game(
             game = Game::new(mode, settings);
             last_tick = Instant::now();
             das = None;
+            irs = None;
+            ihs = false;
             if let Some(m) = music.as_mut() {
                 m.play();
             }
@@ -381,6 +383,8 @@ pub fn run_game(
                             game = Game::new(mode, settings);
                             last_tick = Instant::now();
                             das = None;
+                            irs = None;
+                            ihs = false;
                             if let Some(m) = music.as_mut() {
                                 m.play();
                             }
@@ -422,7 +426,9 @@ pub fn run_game(
                         }
                     }
                     KeyCode::Up | KeyCode::Char('x') | KeyCode::Char('X') => {
-                        if !game.in_are() {
+                        if game.in_are() {
+                            irs = Some(1);
+                        } else {
                             game.rotate_cw();
                             if game.last_move == LastMove::Rotate {
                                 if let Some(m) = music.as_ref() {
@@ -432,7 +438,9 @@ pub fn run_game(
                         }
                     }
                     KeyCode::Char('z') | KeyCode::Char('Z') => {
-                        if !game.in_are() {
+                        if game.in_are() {
+                            irs = Some(-1);
+                        } else {
                             game.rotate_ccw();
                             if game.last_move == LastMove::Rotate {
                                 if let Some(m) = music.as_ref() {
@@ -442,7 +450,9 @@ pub fn run_game(
                         }
                     }
                     KeyCode::Char('c') | KeyCode::Char('C') => {
-                        if !game.in_are() {
+                        if game.in_are() {
+                            ihs = true;
+                        } else {
                             let was_used = game.hold_used;
                             game.hold_piece();
                             if !was_used && game.hold_used {
@@ -495,6 +505,28 @@ pub fn run_game(
 
         if game.in_are() {
             if game.check_are() {
+                if ihs {
+                    ihs = false;
+                    let was_used = game.hold_used;
+                    game.hold_piece();
+                    if !was_used && game.hold_used {
+                        if let Some(m) = music.as_ref() {
+                            m.play_sfx(Sfx::Hold);
+                        }
+                    }
+                }
+                if let Some(dir) = irs.take() {
+                    if dir > 0 {
+                        game.rotate_cw();
+                    } else {
+                        game.rotate_ccw();
+                    }
+                    if game.last_move == LastMove::Rotate {
+                        if let Some(m) = music.as_ref() {
+                            m.play_sfx(Sfx::Rotate);
+                        }
+                    }
+                }
                 last_tick = Instant::now();
                 if let Some(d) = &mut das {
                     if d.charged {
