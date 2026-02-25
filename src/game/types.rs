@@ -6,6 +6,7 @@ pub enum GameMode {
     Sprint,
     Ultra,
     Endless,
+    Versus,
 }
 
 pub const LINE_CLEAR_ANIM_DURATION: Duration = Duration::from_millis(300);
@@ -38,4 +39,10 @@ pub enum LastMove {
 pub struct ClearAction {
     pub label: String,
     pub points: u32,
+    pub cleared_lines: u32,
+    pub is_tspin: bool,
+    pub is_mini: bool,
+    pub is_back_to_back: bool,
+    pub combo: i32,
+    pub is_all_clear: bool,
 }

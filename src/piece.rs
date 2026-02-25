@@ -5,6 +5,7 @@ use rand::Rng;
 pub const BOARD_WIDTH: usize = 10;
 pub const BOARD_HEIGHT: usize = 20;
 pub const EMPTY: u8 = 0;
+pub const GARBAGE_CELL: u8 = 8;
 pub const MAX_NEXT_COUNT: usize = 6;
 pub const KIND_O: usize = 1;
 pub const KIND_T: usize = 2;

@@ -54,6 +54,7 @@ impl Records {
             GameMode::Sprint => &mut self.sprint,
             GameMode::Ultra => &mut self.ultra,
             GameMode::Endless => &mut self.endless,
+            GameMode::Versus => return None,
         };
 
         match mode {
@@ -73,7 +74,7 @@ impl Records {
                 list.truncate(10);
                 Some(pos)
             }
-            GameMode::Marathon | GameMode::Ultra | GameMode::Endless => {
+            GameMode::Marathon | GameMode::Ultra | GameMode::Endless | GameMode::Versus => {
                 let score = record.score;
                 let pos = list
                     .iter()

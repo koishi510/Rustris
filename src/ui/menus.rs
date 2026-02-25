@@ -12,7 +12,7 @@ pub(crate) fn adjust_setting(settings: &mut Settings, sel: usize, direction: i32
     let mc: usize = match mode {
         GameMode::Marathon => 3,
         GameMode::Endless => 2,
-        GameMode::Sprint | GameMode::Ultra => 1,
+        GameMode::Sprint | GameMode::Ultra | GameMode::Versus => 1,
     };
 
     if sel < mc {
@@ -60,6 +60,10 @@ pub(crate) fn adjust_setting(settings: &mut Settings, sel: usize, direction: i32
             GameMode::Ultra => {
                 let v = settings.ultra_time as i32 + direction * 10;
                 settings.ultra_time = v.clamp(30, 300) as u32;
+            }
+            GameMode::Versus => {
+                let v = settings.level as i32 + direction;
+                settings.level = v.clamp(1, 20) as u32;
             }
         }
     } else if sel == mc {
@@ -172,7 +176,7 @@ pub(crate) fn run_settings(
     let mc: usize = match mode {
         GameMode::Marathon => 3,
         GameMode::Endless => 2,
-        GameMode::Sprint | GameMode::Ultra => 1,
+        GameMode::Sprint | GameMode::Ultra | GameMode::Versus => 1,
     };
     let count = mc + 11;
     let idx_bgm = mc + 8;
@@ -287,10 +291,11 @@ pub fn select_mode(
                 KeyCode::Left => {
                     if sel == 0 {
                         mode = match mode {
-                            GameMode::Marathon => GameMode::Endless,
+                            GameMode::Marathon => GameMode::Versus,
                             GameMode::Sprint => GameMode::Marathon,
                             GameMode::Ultra => GameMode::Sprint,
                             GameMode::Endless => GameMode::Ultra,
+                            GameMode::Versus => GameMode::Endless,
                         };
                         if let Some(m) = music.as_ref() {
                             m.play_sfx(Sfx::MenuMove);
@@ -303,7 +308,8 @@ pub fn select_mode(
                             GameMode::Marathon => GameMode::Sprint,
                             GameMode::Sprint => GameMode::Ultra,
                             GameMode::Ultra => GameMode::Endless,
-                            GameMode::Endless => GameMode::Marathon,
+                            GameMode::Endless => GameMode::Versus,
+                            GameMode::Versus => GameMode::Marathon,
                         };
                         if let Some(m) = music.as_ref() {
                             m.play_sfx(Sfx::MenuMove);
@@ -379,10 +385,11 @@ fn run_records(
                 KeyCode::Left => {
                     if sel == 0 {
                         mode = match mode {
-                            GameMode::Marathon => GameMode::Endless,
+                            GameMode::Marathon => GameMode::Versus,
                             GameMode::Sprint => GameMode::Marathon,
                             GameMode::Ultra => GameMode::Sprint,
                             GameMode::Endless => GameMode::Ultra,
+                            GameMode::Versus => GameMode::Endless,
                         };
                         if let Some(m) = music.as_ref() {
                             m.play_sfx(Sfx::MenuMove);
@@ -395,7 +402,8 @@ fn run_records(
                             GameMode::Marathon => GameMode::Sprint,
                             GameMode::Sprint => GameMode::Ultra,
                             GameMode::Ultra => GameMode::Endless,
-                            GameMode::Endless => GameMode::Marathon,
+                            GameMode::Endless => GameMode::Versus,
+                            GameMode::Versus => GameMode::Marathon,
                         };
                         if let Some(m) = music.as_ref() {
                             m.play_sfx(Sfx::MenuMove);

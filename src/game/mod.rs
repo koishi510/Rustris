@@ -1,3 +1,4 @@
+pub mod garbage;
 pub mod types;
 pub use types::*;
 
@@ -49,6 +50,7 @@ impl Game {
         let start_level = match mode {
             GameMode::Marathon | GameMode::Endless => settings.level,
             GameMode::Sprint | GameMode::Ultra => 1,
+            GameMode::Versus => settings.level,
         };
         let mut bag = Bag::new(settings.bag_randomizer);
         let current_kind = bag.next();
@@ -480,6 +482,12 @@ impl Game {
             self.last_action = Some(ClearAction {
                 label,
                 points: total + pc_bonus,
+                cleared_lines: cleared,
+                is_tspin,
+                is_mini,
+                is_back_to_back: is_difficult && self.back_to_back,
+                combo: self.combo,
+                is_all_clear,
             });
             self.last_action_time = Instant::now();
 
@@ -526,6 +534,12 @@ impl Game {
                 self.last_action = Some(ClearAction {
                     label: label.to_string(),
                     points,
+                    cleared_lines: 0,
+                    is_tspin: true,
+                    is_mini,
+                    is_back_to_back: false,
+                    combo: -1,
+                    is_all_clear: false,
                 });
                 self.last_action_time = Instant::now();
             }
@@ -631,6 +645,23 @@ impl Game {
             Some(Duration::from_secs(self.ultra_time as u64).saturating_sub(self.elapsed))
         } else {
             None
+        }
+    }
+
+    pub fn receive_garbage(&mut self, lines: u32, hole_column: usize) {
+        let lines = lines as usize;
+        if lines == 0 {
+            return;
+        }
+        // Shift entire board up by `lines` rows
+        for r in 0..BOARD_HEIGHT.saturating_sub(lines) {
+            self.board[r] = self.board[r + lines];
+        }
+        // Fill bottom rows with garbage (GARBAGE_CELL except hole column)
+        for r in BOARD_HEIGHT.saturating_sub(lines)..BOARD_HEIGHT {
+            for c in 0..BOARD_WIDTH {
+                self.board[r][c] = if c == hole_column { EMPTY } else { GARBAGE_CELL };
+            }
         }
     }
 }

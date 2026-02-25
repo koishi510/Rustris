@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/License-GPL--3.0-green?style=flat-square&logo=opensourceinitiative&logoColor=white)](./LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.85-orange?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 
-A guideline-compliant terminal Tetris written in Rust.
+A guideline-compliant terminal Tetris written in Rust, with LAN multiplayer support.
 
 ## Install
 
@@ -32,6 +32,55 @@ cargo run --release
 | Sprint   | Clear lines (default 40) as fast as possible                 |
 | Ultra    | Score as high as possible within a time limit (default 120s) |
 | Endless  | Play with no goal until game over                            |
+| Versus   | LAN 1v1 - send garbage lines to your opponent                |
+
+## Versus Mode (LAN Multiplayer)
+
+Play 1v1 over a local network. One player hosts, the other joins.
+
+### Quick Start
+
+**Terminal 1 (Host):**
+```sh
+cargo run --release -- --host 3000
+```
+
+**Terminal 2 (Client):**
+```sh
+cargo run --release -- --join 127.0.0.1:3000
+```
+
+Replace `127.0.0.1` with the host's LAN IP for cross-machine play.
+
+You can also start Versus from the in-game menu by cycling to the **Versus** mode and selecting Host or Join.
+
+### Garbage System
+
+Clearing lines sends garbage to your opponent:
+
+| Clear Type       | Attack |
+| ---------------- | ------ |
+| Single           | 0      |
+| Double           | 1      |
+| Triple           | 2      |
+| Tetris           | 4      |
+| T-Spin Single    | 2      |
+| T-Spin Double    | 4      |
+| T-Spin Triple    | 6      |
+| T-Spin Mini Single | 0    |
+| T-Spin Mini Double | 1    |
+| Back-to-Back     | +1     |
+| Perfect Clear    | 10     |
+
+Combo bonus (added on top): 0-1 combo = +0, 2-3 = +1, 4-5 = +2, 6-7 = +3, 8-10 = +4, 11+ = +5.
+
+Pending garbage is absorbed when you clear lines (cancel before send). Uncleared garbage is applied to your board on lock.
+
+### Versus Rules
+
+- Level is fixed (no level-up during a match)
+- Pause is not allowed; Esc opens a Continue/Forfeit menu
+- No records are saved for Versus games
 
 ## Controls
 
@@ -43,7 +92,7 @@ cargo run --release
 | Up / X       | Rotate clockwise         |
 | Z            | Rotate counter-clockwise |
 | C            | Hold piece               |
-| Esc / P      | Pause                    |
+| Esc / P      | Pause (Forfeit in Versus)|
 
 ## Features
 
@@ -59,12 +108,13 @@ cargo run --release
 - **Guideline gravity** with level cap setting
 - **BGM & SFX** with polyphonic playback
 - **Leaderboard** - top 10 per mode, recorded only under default settings
+- **LAN Versus** - P2P TCP multiplayer with garbage system, dual-board rendering, rematch support
 
 ## Settings
 
 | Setting   | Modes             | Range              | Default | Description                          |
 | --------- | ----------------- | ------------------ | ------- | ------------------------------------ |
-| Level     | Marathon, Endless | 1-20               | 1       | Starting level                       |
+| Level     | Marathon, Endless, Versus | 1-20       | 1       | Starting level                       |
 | Goal      | Marathon          | 10-300 (step 10)   | 150     | Lines to clear                       |
 | Goal      | Sprint            | 10-100 (step 10)   | 40      | Lines to clear                       |
 | Time      | Ultra             | 30-300s (step 10)  | 120s    | Time limit                           |
@@ -84,21 +134,31 @@ cargo run --release
 
 ```
 src/
-  main.rs            Entry point, terminal init/cleanup
+  main.rs            Entry point, CLI args (--host/--join), terminal init/cleanup
   ui/
     menus.rs         Mode select, settings, records screens
-    game_loop.rs     Game loop, DAS input, SFX dispatch
+    menus_versus.rs  Versus Host/Join sub-menus with port/address input
+    game_loop.rs     Single-player game loop, DAS input, SFX dispatch
+    versus.rs        Versus game loop, lobby, countdown, garbage, rematch
   game/
     types.rs         GameMode, LastMove, ClearAction, timing constants
     mod.rs           Game struct and all gameplay logic
+    garbage.rs       Attack calculation, garbage queue, cancel logic
+  net/
+    protocol.rs      NetMessage enum, GarbageAttack, BoardSnapshot types
+    transport.rs     Connection: frame encoding/decoding, non-blocking TCP I/O
+    host.rs          TCP listener (non-blocking accept)
+    client.rs        TCP connect
+    mod.rs           Network module exports
   render/
-    board.rs         Main board rendering
+    board.rs         Single-player board rendering
+    versus.rs        Dual-board rendering, lobby/countdown/result screens
     menus.rs         Menu/overlay rendering (pause, game over, settings, etc.)
     mod.rs           Shared render utilities, title, piece preview
   piece.rs           Piece/Bag structs, SRS data (rotation states, kick tables)
   records.rs         Leaderboard persistence (JSON via serde)
   audio.rs           BGM and SFX playback
-  settings.rs        Settings struct and defaults
+  settings.rs        Settings and VersusSettings structs
   bgm_score.rs       BGM note/melody data
 ```
 
@@ -107,7 +167,7 @@ src/
 - [crossterm](https://crates.io/crates/crossterm) - Terminal manipulation
 - [rand](https://crates.io/crates/rand) - Bag shuffling and random generation
 - [rodio](https://crates.io/crates/rodio) - Audio playback
-- [serde](https://crates.io/crates/serde) / [serde_json](https://crates.io/crates/serde_json) - Record serialization
+- [serde](https://crates.io/crates/serde) / [serde_json](https://crates.io/crates/serde_json) - Record and network message serialization
 - [dirs](https://crates.io/crates/dirs) - Platform data directory resolution
 
 ## License

@@ -177,6 +177,7 @@ pub fn run_game(
                 GameMode::Sprint => game.cleared && settings.sprint_goal == 40,
                 GameMode::Ultra => settings.ultra_time == 120,
                 GameMode::Endless => true,
+                GameMode::Versus => false,
             };
             let rank = if valid_for_record {
                 let r = records.add(mode, record);

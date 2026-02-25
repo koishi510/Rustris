@@ -31,9 +31,20 @@ pub fn draw_game_over(
         "GAME  OVER"
     };
 
+    let title_color = if game.cleared {
+        Color::Yellow
+    } else {
+        Color::Red
+    };
+
     let mut content: Vec<Option<String>> = vec![
         None,
-        Some(format!("{:^width$}", title, width = inner_w)),
+        Some(format!(
+            "{}",
+            format!("{:^width$}", title, width = inner_w)
+                .as_str()
+                .with(title_color)
+        )),
         None,
     ];
 
@@ -98,6 +109,7 @@ pub fn draw_mode_select(
         GameMode::Sprint => "Sprint",
         GameMode::Ultra => "Ultra",
         GameMode::Endless => "Endless",
+        GameMode::Versus => "Versus",
     };
 
     let mode_label = format!("< {:^8} >", mode_name);
@@ -187,7 +199,7 @@ pub fn draw_settings(
     let mc: usize = match mode {
         GameMode::Marathon => 3,
         GameMode::Endless => 2,
-        GameMode::Sprint | GameMode::Ultra => 1,
+        GameMode::Sprint | GameMode::Ultra | GameMode::Versus => 1,
     };
 
     let mut content: Vec<Option<String>> = vec![
@@ -220,6 +232,9 @@ pub fn draw_settings(
             GameMode::Ultra => {
                 let time_str = format!("{}s", settings.ultra_time);
                 content.push(Some(settings_value_dim("Time", &time_str, inner_w)));
+            }
+            GameMode::Versus => {
+                content.push(Some(settings_value_dim("Level", &settings.level.to_string(), inner_w)));
             }
         }
         content.push(Some(settings_value_dim("Next", &settings.next_count.to_string(), inner_w)));
@@ -266,6 +281,9 @@ pub fn draw_settings(
                 let time_str = format!("{}s", settings.ultra_time);
                 content.push(Some(settings_value("Time", &time_str, selected == 0, inner_w)));
             }
+            GameMode::Versus => {
+                content.push(Some(settings_value("Level", &settings.level.to_string(), selected == 0, inner_w)));
+            }
         }
 
         content.push(Some(settings_value("Next", &settings.next_count.to_string(), selected == mc, inner_w)));
@@ -307,6 +325,7 @@ pub fn draw_records(
         GameMode::Sprint => "Sprint",
         GameMode::Ultra => "Ultra",
         GameMode::Endless => "Endless",
+        GameMode::Versus => "Versus",
     };
     let mode_label = format!("< {:^8} >", mode_name);
 
@@ -314,7 +333,7 @@ pub fn draw_records(
         GameMode::Marathon => &records.marathon,
         GameMode::Sprint => &records.sprint,
         GameMode::Ultra => &records.ultra,
-        GameMode::Endless => &records.endless,
+        GameMode::Endless | GameMode::Versus => &records.endless,
     };
 
     let separator = "─".repeat(inner_w);

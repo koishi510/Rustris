@@ -170,6 +170,9 @@ pub enum Sfx {
     BackToBack,
     Clear,
     MenuBack,
+    GarbageReceived,
+    VersusWin,
+    VersusLose,
 }
 
 impl Sfx {
@@ -223,6 +226,12 @@ impl Sfx {
                 (1568.0, 100), (1175.0, 60), (1568.0, 150),
             ],
             Sfx::MenuBack => vec![(523.0, 30), (392.0, 50)],
+            Sfx::GarbageReceived => vec![(200.0, 40), (150.0, 60)],
+            Sfx::VersusWin => vec![
+                (784.0, 80), (988.0, 80), (1175.0, 80),
+                (1568.0, 100), (1175.0, 60), (1568.0, 200),
+            ],
+            Sfx::VersusLose => vec![(440.0, 150), (370.0, 150), (311.0, 200), (247.0, 350)],
         }
     }
 }

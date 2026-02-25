@@ -1,12 +1,15 @@
 mod board;
 mod menus;
+pub mod versus;
 
 pub use board::draw;
 pub use menus::{draw_game_over, draw_help, draw_mode_select, draw_pause, draw_records, draw_settings};
 
 use crossterm::style::{Color, Stylize};
 use std::io::{self, Write};
+use std::time::Duration;
 
+use crate::game::{Game, GameMode};
 use crate::piece::*;
 
 pub(crate) const LEFT_W: usize = 12;
@@ -60,7 +63,11 @@ pub(crate) fn settings_toggle_dim(label: &str, on: bool, inner_w: usize) -> Stri
 }
 
 pub(crate) fn color_for(id: u8) -> Color {
-    PIECE_COLORS[(id - 1) as usize]
+    if id == GARBAGE_CELL {
+        Color::DarkGrey
+    } else {
+        PIECE_COLORS[(id - 1) as usize]
+    }
 }
 
 pub(crate) fn draw_piece_preview(
@@ -89,6 +96,10 @@ pub(crate) fn draw_piece_preview(
 }
 
 pub(crate) fn draw_title(stdout: &mut io::Stdout) -> io::Result<()> {
+    draw_title_padded(stdout, 4)
+}
+
+pub(crate) fn draw_title_padded(stdout: &mut io::Stdout, pad: usize) -> io::Result<()> {
     const LETTERS: [(Color, [&str; 6]); 6] = [
         // T
         (Color::Red, [
@@ -147,7 +158,7 @@ pub(crate) fn draw_title(stdout: &mut io::Stdout) -> io::Result<()> {
     ];
 
     for row in 0..6 {
-        write!(stdout, "    ")?;
+        write!(stdout, "{:pad$}", "")?;
         for (color, letter) in &LETTERS {
             write!(stdout, "{}", letter[row].with(*color))?;
         }
@@ -198,5 +209,82 @@ pub(crate) fn draw_full_board_overlay(
 
     write!(stdout, "\x1b[J")?;
     stdout.flush()?;
+    Ok(())
+}
+
+pub(crate) fn draw_right_panel(stdout: &mut io::Stdout, game: &Game, row: usize) -> io::Result<()> {
+    let show_action = game.last_action.is_some()
+        && game.last_action_time.elapsed() < Duration::from_secs(3);
+
+    match row {
+        0 if game.hold_enabled => {
+            if game.hold_used {
+                write!(stdout, "  {}", "HOLD:".with(Color::DarkGrey))?;
+            } else {
+                write!(stdout, "  HOLD:")?;
+            }
+        }
+        2 | 3 if game.hold_enabled => {
+            let pr = (row - 2) as i32;
+            if let Some(kind) = game.hold {
+                draw_piece_preview(stdout, kind, pr)?;
+            }
+        }
+        5 => match game.mode {
+            GameMode::Marathon | GameMode::Endless | GameMode::Versus => write!(stdout, "  SCORE: {}", game.score)?,
+            GameMode::Sprint => {
+                let secs = game.elapsed.as_secs();
+                let centis = game.elapsed.subsec_millis() / 10;
+                write!(stdout, "  TIME: {}:{:02}.{:02}", secs / 60, secs % 60, centis)?;
+            }
+            GameMode::Ultra => {
+                if let Some(rem) = game.time_remaining() {
+                    let secs = rem.as_secs();
+                    let centis = rem.subsec_millis() / 10;
+                    write!(stdout, "  TIME: {}:{:02}.{:02}", secs / 60, secs % 60, centis)?;
+                }
+            }
+        },
+        6 => match game.mode {
+            GameMode::Marathon => write!(stdout, "  LINES: {} / {}", game.lines, game.marathon_goal)?,
+            GameMode::Endless | GameMode::Versus => write!(stdout, "  LINES: {}", game.lines)?,
+            GameMode::Sprint => write!(stdout, "  LINES: {} / {}", game.lines, game.sprint_goal)?,
+            GameMode::Ultra => write!(stdout, "  SCORE: {}", game.score)?,
+        },
+        7 => match game.mode {
+            GameMode::Marathon | GameMode::Sprint | GameMode::Endless | GameMode::Versus => write!(stdout, "  LEVEL: {}", game.level)?,
+            GameMode::Ultra => write!(stdout, "  LINES: {}", game.lines)?,
+        },
+        8 => match game.mode {
+            GameMode::Ultra => write!(stdout, "  LEVEL: {}", game.level)?,
+            _ => {
+                if show_action {
+                    let action = game.last_action.as_ref().unwrap();
+                    write!(stdout, "  {}", action.label.as_str().with(Color::Yellow))?;
+                }
+            }
+        },
+        9 => match game.mode {
+            GameMode::Ultra => {
+                if show_action {
+                    let action = game.last_action.as_ref().unwrap();
+                    write!(stdout, "  {}", action.label.as_str().with(Color::Yellow))?;
+                }
+            }
+            _ => {
+                if show_action {
+                    let action = game.last_action.as_ref().unwrap();
+                    write!(stdout, "  {}", format!("+{}", action.points).with(Color::Yellow))?;
+                }
+            }
+        },
+        10 => {
+            if game.mode == GameMode::Ultra && show_action {
+                let action = game.last_action.as_ref().unwrap();
+                write!(stdout, "  {}", format!("+{}", action.points).with(Color::Yellow))?;
+            }
+        }
+        _ => {}
+    }
     Ok(())
 }
