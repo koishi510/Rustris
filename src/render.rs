@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use crate::game::{Game, GameMode};
 use crate::piece::*;
+use crate::records::Records;
 use crate::settings::Settings;
 
 const LEFT_W: usize = 12;
@@ -273,7 +274,7 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
                 }
             }
             5 => match game.mode {
-                GameMode::Marathon => write!(stdout, "  SCORE: {}", game.score)?,
+                GameMode::Marathon | GameMode::Endless => write!(stdout, "  SCORE: {}", game.score)?,
                 GameMode::Sprint => {
                     let secs = game.elapsed.as_secs();
                     let centis = game.elapsed.subsec_millis() / 10;
@@ -288,15 +289,13 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
                 }
             },
             6 => match game.mode {
-                GameMode::Marathon => match game.marathon_goal {
-                    Some(g) => write!(stdout, "  LINES: {} / {}", game.lines, g)?,
-                    None => write!(stdout, "  LINES: {}", game.lines)?,
-                },
+                GameMode::Marathon => write!(stdout, "  LINES: {} / {}", game.lines, game.marathon_goal)?,
+                GameMode::Endless => write!(stdout, "  LINES: {}", game.lines)?,
                 GameMode::Sprint => write!(stdout, "  LINES: {} / {}", game.lines, game.sprint_goal)?,
                 GameMode::Ultra => write!(stdout, "  SCORE: {}", game.score)?,
             },
             7 => match game.mode {
-                GameMode::Marathon | GameMode::Sprint => write!(stdout, "  LEVEL: {}", game.level)?,
+                GameMode::Marathon | GameMode::Sprint | GameMode::Endless => write!(stdout, "  LEVEL: {}", game.level)?,
                 GameMode::Ultra => write!(stdout, "  LINES: {}", game.lines)?,
             },
             8 => match game.mode {
@@ -383,7 +382,12 @@ fn draw_full_board_overlay(
     Ok(())
 }
 
-pub fn draw_game_over(stdout: &mut io::Stdout, game: &Game, selected: usize) -> io::Result<()> {
+pub fn draw_game_over(
+    stdout: &mut io::Stdout,
+    game: &Game,
+    selected: usize,
+    rank: Option<usize>,
+) -> io::Result<()> {
     execute!(stdout, cursor::MoveTo(0, 0))?;
     draw_title(stdout)?;
 
@@ -413,6 +417,11 @@ pub fn draw_game_over(stdout: &mut io::Stdout, game: &Game, selected: usize) -> 
     content.push(Some(format!("{:>9}: {:<9}", "SCORE", game.score)));
     content.push(Some(format!("{:>9}: {:<9}", "LINES", game.lines)));
     content.push(Some(format!("{:>9}: {:<9}", "LEVEL", game.level)));
+    if let Some(r) = rank {
+        let record_text = format!("NEW RECORD! #{}", r + 1);
+        let padded = format!("{:^width$}", record_text, width = inner_w);
+        content.push(Some(format!("{}", padded.as_str().with(Color::Yellow))));
+    }
     content.push(None);
     content.push(Some(menu_item("Retry", selected == 0, inner_w)));
     content.push(Some(menu_item("Menu", selected == 1, inner_w)));
@@ -458,6 +467,7 @@ pub fn draw_mode_select(
         GameMode::Marathon => "Marathon",
         GameMode::Sprint => "Sprint",
         GameMode::Ultra => "Ultra",
+        GameMode::Endless => "Endless",
     };
 
     let mode_label = format!("< {:^8} >", mode_name);
@@ -468,8 +478,9 @@ pub fn draw_mode_select(
         None,
         Some(menu_item("Start", selected == 1, inner_w)),
         Some(menu_item("Settings", selected == 2, inner_w)),
-        Some(menu_item("Help", selected == 3, inner_w)),
-        Some(menu_item("Quit", selected == 4, inner_w)),
+        Some(menu_item("Records", selected == 3, inner_w)),
+        Some(menu_item("Help", selected == 4, inner_w)),
+        Some(menu_item("Quit", selected == 5, inner_w)),
         None,
     ];
 
@@ -545,6 +556,7 @@ pub fn draw_settings(
     let inner_w = BOARD_WIDTH * 2;
     let mc: usize = match mode {
         GameMode::Marathon => 3,
+        GameMode::Endless => 2,
         GameMode::Sprint | GameMode::Ultra => 1,
     };
 
@@ -557,11 +569,15 @@ pub fn draw_settings(
         match mode {
             GameMode::Marathon => {
                 content.push(Some(settings_value_dim("Level", &settings.level.to_string(), inner_w)));
-                let goal_str = match settings.marathon_goal {
-                    Some(g) => g.to_string(),
+                content.push(Some(settings_value_dim("Goal", &settings.marathon_goal.to_string(), inner_w)));
+                let cap_str = match settings.level_cap {
+                    Some(c) => c.to_string(),
                     None => "None".to_string(),
                 };
-                content.push(Some(settings_value_dim("Goal", &goal_str, inner_w)));
+                content.push(Some(settings_value_dim("Cap", &cap_str, inner_w)));
+            }
+            GameMode::Endless => {
+                content.push(Some(settings_value_dim("Level", &settings.level.to_string(), inner_w)));
                 let cap_str = match settings.level_cap {
                     Some(c) => c.to_string(),
                     None => "None".to_string(),
@@ -589,16 +605,20 @@ pub fn draw_settings(
         match mode {
             GameMode::Marathon => {
                 content.push(Some(settings_value("Level", &settings.level.to_string(), selected == 0, inner_w)));
-                let goal_str = match settings.marathon_goal {
-                    Some(g) => g.to_string(),
-                    None => "None".to_string(),
-                };
-                content.push(Some(settings_value("Goal", &goal_str, selected == 1, inner_w)));
+                content.push(Some(settings_value("Goal", &settings.marathon_goal.to_string(), selected == 1, inner_w)));
                 let cap_str = match settings.level_cap {
                     Some(c) => c.to_string(),
                     None => "None".to_string(),
                 };
                 content.push(Some(settings_value("Cap", &cap_str, selected == 2, inner_w)));
+            }
+            GameMode::Endless => {
+                content.push(Some(settings_value("Level", &settings.level.to_string(), selected == 0, inner_w)));
+                let cap_str = match settings.level_cap {
+                    Some(c) => c.to_string(),
+                    None => "None".to_string(),
+                };
+                content.push(Some(settings_value("Cap", &cap_str, selected == 1, inner_w)));
             }
             GameMode::Sprint => {
                 content.push(Some(settings_value("Goal", &settings.sprint_goal.to_string(), selected == 0, inner_w)));
@@ -619,6 +639,87 @@ pub fn draw_settings(
         content.push(None);
         content.push(Some(menu_item("Back", selected == mc + 6, inner_w)));
     }
+
+    draw_full_board_overlay(stdout, &content)
+}
+
+pub fn draw_records(
+    stdout: &mut io::Stdout,
+    records: &Records,
+    mode: GameMode,
+    selected: usize,
+) -> io::Result<()> {
+    execute!(stdout, cursor::MoveTo(0, 0))?;
+    draw_title(stdout)?;
+
+    let inner_w = BOARD_WIDTH * 2;
+
+    let mode_name = match mode {
+        GameMode::Marathon => "Marathon",
+        GameMode::Sprint => "Sprint",
+        GameMode::Ultra => "Ultra",
+        GameMode::Endless => "Endless",
+    };
+    let mode_label = format!("< {:^8} >", mode_name);
+
+    let list = match mode {
+        GameMode::Marathon => &records.marathon,
+        GameMode::Sprint => &records.sprint,
+        GameMode::Ultra => &records.ultra,
+        GameMode::Endless => &records.endless,
+    };
+
+    let separator = "─".repeat(inner_w);
+
+    let mut content: Vec<Option<String>> = Vec::new();
+    content.push(Some(menu_item(&mode_label, selected == 0, inner_w)));
+    content.push(Some(separator.clone()));
+
+    for i in 0..10 {
+        if i < list.len() {
+            let r = &list[i];
+            let line = match mode {
+                GameMode::Sprint => {
+                    let t = r.time.unwrap_or(0);
+                    let secs = t / 1000;
+                    let centis = (t % 1000) / 10;
+                    format!(
+                        "#{:<2} {}:{:02}.{:02} L{:<2} {:>3}L",
+                        i + 1,
+                        secs / 60,
+                        secs % 60,
+                        centis,
+                        r.level,
+                        r.lines,
+                    )
+                }
+                _ => {
+                    format!(
+                        "#{:<2} {:>7} L{:<2} {:>3}L",
+                        i + 1,
+                        r.score,
+                        r.level,
+                        r.lines,
+                    )
+                }
+            };
+            content.push(Some(format!("{:^width$}", line, width = inner_w)));
+        } else {
+            let line = match mode {
+                GameMode::Sprint => {
+                    format!("#{:<2} {:>7} L{:<2} {:>3}L", i + 1, "-:--.--", "-", "-")
+                }
+                _ => {
+                    format!("#{:<2} {:>7} L{:<2} {:>3}L", i + 1, "-", "-", "-")
+                }
+            };
+            let padded = format!("{:^width$}", line, width = inner_w);
+            content.push(Some(format!("{}", padded.as_str().with(Color::DarkGrey))));
+        }
+    }
+
+    content.push(Some(separator));
+    content.push(Some(menu_item("Back", selected == 1, inner_w)));
 
     draw_full_board_overlay(stdout, &content)
 }

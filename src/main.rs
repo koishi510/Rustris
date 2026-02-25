@@ -1,6 +1,7 @@
 mod audio;
 mod game;
 mod piece;
+mod records;
 mod render;
 mod settings;
 
@@ -11,11 +12,12 @@ use crossterm::{
     terminal,
 };
 use std::io;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use audio::Sfx;
 use game::{Game, GameMode, LastMove, ARE_DELAY, LOCK_DELAY};
 use piece::MAX_NEXT_COUNT;
+use records::Records;
 use settings::Settings;
 
 const DAS_DELAY: Duration = Duration::from_millis(167);
@@ -43,11 +45,64 @@ impl DasState {
     }
 }
 
+fn iso8601_now() -> String {
+    let dur = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs = dur.as_secs();
+    let days = secs / 86400;
+    let time_of_day = secs % 86400;
+    let hours = time_of_day / 3600;
+    let minutes = (time_of_day % 3600) / 60;
+    let seconds = time_of_day % 60;
+
+    // Days since epoch to Y-M-D (simplified leap year calculation)
+    let mut y = 1970i64;
+    let mut remaining = days as i64;
+    loop {
+        let days_in_year = if y % 4 == 0 && (y % 100 != 0 || y % 400 == 0) {
+            366
+        } else {
+            365
+        };
+        if remaining < days_in_year {
+            break;
+        }
+        remaining -= days_in_year;
+        y += 1;
+    }
+    let leap = y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
+    let month_days: [i64; 12] = [
+        31,
+        if leap { 29 } else { 28 },
+        31, 30, 31, 30, 31, 31, 30, 31, 30, 31,
+    ];
+    let mut m = 0;
+    for (i, &md) in month_days.iter().enumerate() {
+        if remaining < md {
+            m = i;
+            break;
+        }
+        remaining -= md;
+    }
+    let d = remaining + 1;
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        y,
+        m + 1,
+        d,
+        hours,
+        minutes,
+        seconds
+    )
+}
+
 fn main() -> io::Result<()> {
     let mut stdout = io::stdout();
 
     let mut music = audio::MusicPlayer::new();
     let mut settings = Settings::default();
+    let mut records = Records::load();
 
     terminal::enable_raw_mode()?;
     execute!(
@@ -59,11 +114,11 @@ fn main() -> io::Result<()> {
 
     let result = (|| {
         loop {
-            let mode = match select_mode(&mut stdout, &mut music, &mut settings)? {
+            let mode = match select_mode(&mut stdout, &mut music, &mut settings, &mut records)? {
                 Some(m) => m,
                 None => return Ok(()),
             };
-            match run_game(&mut stdout, mode, &mut music, &mut settings)? {
+            match run_game(&mut stdout, mode, &mut music, &mut settings, &mut records)? {
                 true => return Ok(()),
                 false => continue,
             }
@@ -79,6 +134,7 @@ fn main() -> io::Result<()> {
 fn adjust_setting(settings: &mut Settings, sel: usize, direction: i32, mode: GameMode) {
     let mc: usize = match mode {
         GameMode::Marathon => 3,
+        GameMode::Endless => 2,
         GameMode::Sprint | GameMode::Ultra => 1,
     };
 
@@ -90,15 +146,26 @@ fn adjust_setting(settings: &mut Settings, sel: usize, direction: i32, mode: Gam
                     settings.level = v.clamp(1, 20) as u32;
                 }
                 1 => {
-                    match (settings.marathon_goal, direction) {
-                        (Some(g), 1) if g >= 300 => settings.marathon_goal = None,
-                        (Some(g), 1) => settings.marathon_goal = Some((g + 10).min(300)),
-                        (Some(g), -1) => settings.marathon_goal = Some(if g <= 10 { 10 } else { g - 10 }),
-                        (None, -1) => settings.marathon_goal = Some(300),
+                    let v = settings.marathon_goal as i32 + direction * 10;
+                    settings.marathon_goal = v.clamp(10, 300) as u32;
+                }
+                2 => {
+                    match (settings.level_cap, direction) {
+                        (Some(c), 1) if c >= 20 => settings.level_cap = None,
+                        (Some(c), 1) => settings.level_cap = Some((c + 1).min(20)),
+                        (Some(c), -1) => settings.level_cap = Some(if c <= 1 { 1 } else { c - 1 }),
+                        (None, -1) => settings.level_cap = Some(20),
                         _ => {}
                     }
                 }
-                2 => {
+                _ => {}
+            },
+            GameMode::Endless => match sel {
+                0 => {
+                    let v = settings.level as i32 + direction;
+                    settings.level = v.clamp(1, 20) as u32;
+                }
+                1 => {
                     match (settings.level_cap, direction) {
                         (Some(c), 1) if c >= 20 => settings.level_cap = None,
                         (Some(c), 1) => settings.level_cap = Some((c + 1).min(20)),
@@ -196,6 +263,7 @@ fn run_settings(
 
     let mc: usize = match mode {
         GameMode::Marathon => 3,
+        GameMode::Endless => 2,
         GameMode::Sprint | GameMode::Ultra => 1,
     };
     let count = mc + 7;
@@ -282,10 +350,11 @@ fn select_mode(
     stdout: &mut io::Stdout,
     music: &mut Option<audio::MusicPlayer>,
     settings: &mut Settings,
+    records: &mut Records,
 ) -> io::Result<Option<GameMode>> {
     let mut mode = GameMode::Marathon;
     let mut sel: usize = 0;
-    let count: usize = 5;
+    let count: usize = 6;
 
     loop {
         render::draw_mode_select(stdout, mode, sel)?;
@@ -307,9 +376,10 @@ fn select_mode(
                 KeyCode::Left => {
                     if sel == 0 {
                         mode = match mode {
-                            GameMode::Marathon => GameMode::Ultra,
+                            GameMode::Marathon => GameMode::Endless,
                             GameMode::Sprint => GameMode::Marathon,
                             GameMode::Ultra => GameMode::Sprint,
+                            GameMode::Endless => GameMode::Ultra,
                         };
                         if let Some(m) = music.as_ref() {
                             m.play_sfx(Sfx::MenuMove);
@@ -321,7 +391,8 @@ fn select_mode(
                         mode = match mode {
                             GameMode::Marathon => GameMode::Sprint,
                             GameMode::Sprint => GameMode::Ultra,
-                            GameMode::Ultra => GameMode::Marathon,
+                            GameMode::Ultra => GameMode::Endless,
+                            GameMode::Endless => GameMode::Marathon,
                         };
                         if let Some(m) = music.as_ref() {
                             m.play_sfx(Sfx::MenuMove);
@@ -343,6 +414,11 @@ fn select_mode(
                         if let Some(m) = music.as_ref() {
                             m.play_sfx(Sfx::MenuSelect);
                         }
+                        run_records(stdout, music, records, mode)?;
+                    } else if sel == 4 {
+                        if let Some(m) = music.as_ref() {
+                            m.play_sfx(Sfx::MenuSelect);
+                        }
                         render::draw_help(stdout, 0)?;
                         loop {
                             if let Event::Key(KeyEvent { code, .. }) = event::read()? {
@@ -354,9 +430,80 @@ fn select_mode(
                                 }
                             }
                         }
-                    } else if sel == 4 {
+                    } else if sel == 5 {
                         return Ok(None);
                     }
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+fn run_records(
+    stdout: &mut io::Stdout,
+    music: &mut Option<audio::MusicPlayer>,
+    records: &Records,
+    initial_mode: GameMode,
+) -> io::Result<()> {
+    let mut mode = initial_mode;
+    let mut sel: usize = 1;
+
+    loop {
+        render::draw_records(stdout, records, mode, sel)?;
+        if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+            match code {
+                KeyCode::Up => {
+                    sel = sel.checked_sub(1).unwrap_or(1);
+                    if let Some(m) = music.as_ref() {
+                        m.play_sfx(Sfx::MenuMove);
+                    }
+                }
+                KeyCode::Down => {
+                    sel = 1;
+                    if let Some(m) = music.as_ref() {
+                        m.play_sfx(Sfx::MenuMove);
+                    }
+                }
+                KeyCode::Left => {
+                    if sel == 0 {
+                        mode = match mode {
+                            GameMode::Marathon => GameMode::Endless,
+                            GameMode::Sprint => GameMode::Marathon,
+                            GameMode::Ultra => GameMode::Sprint,
+                            GameMode::Endless => GameMode::Ultra,
+                        };
+                        if let Some(m) = music.as_ref() {
+                            m.play_sfx(Sfx::MenuMove);
+                        }
+                    }
+                }
+                KeyCode::Right => {
+                    if sel == 0 {
+                        mode = match mode {
+                            GameMode::Marathon => GameMode::Sprint,
+                            GameMode::Sprint => GameMode::Ultra,
+                            GameMode::Ultra => GameMode::Endless,
+                            GameMode::Endless => GameMode::Marathon,
+                        };
+                        if let Some(m) = music.as_ref() {
+                            m.play_sfx(Sfx::MenuMove);
+                        }
+                    }
+                }
+                KeyCode::Enter => {
+                    if sel == 1 {
+                        if let Some(m) = music.as_ref() {
+                            m.play_sfx(Sfx::MenuBack);
+                        }
+                        return Ok(());
+                    }
+                }
+                KeyCode::Esc => {
+                    if let Some(m) = music.as_ref() {
+                        m.play_sfx(Sfx::MenuBack);
+                    }
+                    return Ok(());
                 }
                 _ => {}
             }
@@ -409,6 +556,7 @@ fn run_game(
     mode: GameMode,
     music: &mut Option<audio::MusicPlayer>,
     settings: &mut Settings,
+    records: &mut Records,
 ) -> io::Result<bool> {
     let mut game = Game::new(mode, settings);
     let mut last_tick = Instant::now();
@@ -434,10 +582,34 @@ fn run_game(
                     m.play_sfx(Sfx::GameOver);
                 }
             }
+
+            let time_ms = Some(game.elapsed.as_millis() as u64);
+            let now = iso8601_now();
+            let record = records::ScoreRecord {
+                score: game.score,
+                lines: game.lines,
+                level: game.level,
+                time: time_ms,
+                date: now,
+            };
+            let valid_for_record = match mode {
+                GameMode::Marathon => settings.marathon_goal == 150,
+                GameMode::Sprint => game.cleared && settings.sprint_goal == 40,
+                GameMode::Ultra => settings.ultra_time == 120,
+                GameMode::Endless => true,
+            };
+            let rank = if valid_for_record {
+                let r = records.add(mode, record);
+                records.save();
+                r
+            } else {
+                None
+            };
+
             let mut sel: usize = 0;
             let count: usize = 3;
             loop {
-                render::draw_game_over(stdout, &game, sel)?;
+                render::draw_game_over(stdout, &game, sel, rank)?;
                 if let Event::Key(KeyEvent { code, .. }) = event::read()? {
                     match code {
                         KeyCode::Up => {

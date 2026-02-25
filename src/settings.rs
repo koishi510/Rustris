@@ -3,7 +3,7 @@ use crate::piece::MAX_NEXT_COUNT;
 #[derive(Clone, Copy)]
 pub struct Settings {
     pub level: u32,                // 1..=20
-    pub marathon_goal: Option<u32>, // Some(10..=300 step 10) or None (unlimited)
+    pub marathon_goal: u32,         // 10..=300, step 10
     pub sprint_goal: u32,          // 10..=100, step 10
     pub ultra_time: u32,           // 30..=300, step 10 (seconds)
     pub level_cap: Option<u32>,    // Some(1..=20) or None (no cap)
@@ -17,7 +17,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             level: 1,
-            marathon_goal: Some(150),
+            marathon_goal: 150,
             sprint_goal: 40,
             ultra_time: 120,
             level_cap: Some(15),

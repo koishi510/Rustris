@@ -8,6 +8,7 @@ pub enum GameMode {
     Marathon,
     Sprint,
     Ultra,
+    Endless,
 }
 
 pub const LOCK_DELAY: Duration = Duration::from_millis(500);
@@ -67,7 +68,7 @@ pub struct Game {
     pub game_start: Instant,
     pub elapsed: Duration,
     pub cleared: bool,
-    pub marathon_goal: Option<u32>,
+    pub marathon_goal: u32,
     pub sprint_goal: u32,
     pub ultra_time: u32,
     pub level_cap: Option<u32>,
@@ -79,7 +80,7 @@ pub struct Game {
 impl Game {
     pub fn new(mode: GameMode, settings: &Settings) -> Self {
         let start_level = match mode {
-            GameMode::Marathon => settings.level,
+            GameMode::Marathon | GameMode::Endless => settings.level,
             GameMode::Sprint | GameMode::Ultra => 1,
         };
         let mut bag = Bag::new(settings.bag_randomizer);
@@ -487,7 +488,7 @@ impl Game {
                 self.back_to_back = false;
             }
 
-            if self.mode == GameMode::Marathon {
+            if self.mode == GameMode::Marathon || self.mode == GameMode::Endless {
                 let new_level = self.start_level + self.lines / 10;
                 self.level = match self.level_cap {
                     Some(cap) if self.start_level > cap => self.start_level,
@@ -496,7 +497,7 @@ impl Game {
                 };
             }
 
-            if (self.mode == GameMode::Marathon && self.marathon_goal.map_or(false, |g| self.lines >= g))
+            if (self.mode == GameMode::Marathon && self.lines >= self.marathon_goal)
                 || (self.mode == GameMode::Sprint && self.lines >= self.sprint_goal)
             {
                 self.cleared = true;
