@@ -56,10 +56,10 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
 
     for row in 0..BOARD_HEIGHT {
         match row {
-            0 => {
+            0 if game.next_count > 0 => {
                 write!(stdout, "{:<LEFT_W$}", "  NEXT:")?;
             }
-            2..=19 => {
+            2..=19 if game.next_count > 0 => {
                 let offset = row - 2;
                 let slot = offset / 3;
                 let in_slot = offset % 3;
@@ -105,14 +105,14 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
 
         write!(stdout, "║")?;
         match row {
-            0 => {
+            0 if game.hold_enabled => {
                 if game.hold_used {
                     write!(stdout, "  {}", "HOLD:".with(Color::DarkGrey))?;
                 } else {
                     write!(stdout, "  HOLD:")?;
                 }
             }
-            2 | 3 => {
+            2 | 3 if game.hold_enabled => {
                 let pr = (row - 2) as i32;
                 if let Some(kind) = game.hold {
                     draw_piece_preview(stdout, kind, pr)?;

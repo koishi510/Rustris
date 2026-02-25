@@ -11,6 +11,10 @@ pub struct Settings {
     pub line_clear_anim: bool,
     pub next_count: usize,         // 1..=MAX_NEXT_COUNT
     pub bag_randomizer: bool,      // true=7-bag, false=pure random
+    pub srs: bool,                 // true=SRS with wall kicks
+    pub hold_enabled: bool,
+    pub lock_delay_ms: u32,        // 0..=2000, step 100 (milliseconds)
+    pub move_reset: Option<u32>,   // Some(1..=30) or None (unlimited)
 }
 
 impl Default for Settings {
@@ -25,6 +29,10 @@ impl Default for Settings {
             line_clear_anim: true,
             next_count: MAX_NEXT_COUNT,
             bag_randomizer: true,
+            srs: true,
+            hold_enabled: true,
+            lock_delay_ms: 500,
+            move_reset: Some(15),
         }
     }
 }

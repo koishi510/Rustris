@@ -37,6 +37,11 @@ pub struct Game {
     pub ghost_enabled: bool,
     pub line_clear_anim_enabled: bool,
     pub next_count: usize,
+    pub srs: bool,
+    pub hold_enabled: bool,
+    pub lock_delay_ms: u32,
+    pub move_reset: Option<u32>,
+    pub move_reset_count: u32,
 }
 
 impl Game {
@@ -82,10 +87,18 @@ impl Game {
             ghost_enabled: settings.ghost,
             line_clear_anim_enabled: settings.line_clear_anim,
             next_count: settings.next_count,
+            srs: settings.srs,
+            hold_enabled: settings.hold_enabled,
+            lock_delay_ms: settings.lock_delay_ms,
+            move_reset: settings.move_reset,
+            move_reset_count: 0,
         }
     }
 
     fn pop_next(&mut self) -> Piece {
+        if self.next_queue.is_empty() {
+            return Piece::new(self.bag.next());
+        }
         let kind = self.next_queue.remove(0);
         self.next_queue.push(self.bag.next());
         Piece::new(kind)
@@ -181,13 +194,14 @@ impl Game {
         self.hold_used = false;
         self.last_move = LastMove::None;
         self.lock_delay = None;
+        self.move_reset_count = 0;
         if !self.fits(&self.current) {
             self.game_over = true;
         }
     }
 
     pub fn hold_piece(&mut self) {
-        if self.hold_used {
+        if !self.hold_enabled || self.hold_used {
             return;
         }
         self.hold_used = true;
@@ -210,6 +224,7 @@ impl Game {
             }
         }
         self.last_move = LastMove::None;
+        self.move_reset_count = 0;
     }
 
     fn is_on_ground(&self) -> bool {
@@ -227,7 +242,10 @@ impl Game {
             self.last_move = LastMove::Move;
             if self.lock_delay.is_some() {
                 if self.is_on_ground() {
-                    self.lock_delay = Some(Instant::now());
+                    if self.move_reset.map_or(true, |limit| self.move_reset_count < limit) {
+                        self.lock_delay = Some(Instant::now());
+                        self.move_reset_count += 1;
+                    }
                 } else {
                     self.lock_delay = None;
                 }
@@ -243,32 +261,55 @@ impl Game {
             return;
         }
 
-        let from = self.current.rotation;
-        let to = new_rotation;
-        let kick_table = if self.current.kind == 0 {
-            &KICK_I
-        } else {
-            &KICK_JLTSZ
-        };
-        let idx = kick_index(from, to);
-        let kicks = &kick_table[idx];
+        if self.srs {
+            let from = self.current.rotation;
+            let to = new_rotation;
+            let kick_table = if self.current.kind == 0 {
+                &KICK_I
+            } else {
+                &KICK_JLTSZ
+            };
+            let idx = kick_index(from, to);
+            let kicks = &kick_table[idx];
 
-        for &[dc, dr] in kicks {
+            for &[dc, dr] in kicks {
+                let mut test = self.current.clone();
+                test.rotation = to;
+                test.col += dc;
+                test.row += dr;
+                if self.fits(&test) {
+                    self.current = test;
+                    self.last_move = LastMove::Rotate;
+                    if self.lock_delay.is_some() {
+                        if self.is_on_ground() {
+                            if self.move_reset.map_or(true, |limit| self.move_reset_count < limit) {
+                                self.lock_delay = Some(Instant::now());
+                                self.move_reset_count += 1;
+                            }
+                        } else {
+                            self.lock_delay = None;
+                        }
+                    }
+                    return;
+                }
+            }
+        } else {
+            // No SRS: try basic rotation without wall kicks
             let mut test = self.current.clone();
-            test.rotation = to;
-            test.col += dc;
-            test.row += dr;
+            test.rotation = new_rotation;
             if self.fits(&test) {
                 self.current = test;
                 self.last_move = LastMove::Rotate;
                 if self.lock_delay.is_some() {
                     if self.is_on_ground() {
-                        self.lock_delay = Some(Instant::now());
+                        if self.move_reset.map_or(true, |limit| self.move_reset_count < limit) {
+                            self.lock_delay = Some(Instant::now());
+                            self.move_reset_count += 1;
+                        }
                     } else {
                         self.lock_delay = None;
                     }
                 }
-                return;
             }
         }
     }
@@ -574,6 +615,10 @@ impl Game {
             let time_per_row = (0.8 - (lvl - 1.0) * 0.007).powf(lvl - 1.0);
             Duration::from_secs_f64(time_per_row)
         }
+    }
+
+    pub fn lock_delay_duration(&self) -> Duration {
+        Duration::from_millis(self.lock_delay_ms as u64)
     }
 
     pub fn update_elapsed(&mut self) {

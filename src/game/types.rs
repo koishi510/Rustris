@@ -8,7 +8,6 @@ pub enum GameMode {
     Endless,
 }
 
-pub const LOCK_DELAY: Duration = Duration::from_millis(500);
 pub const LINE_CLEAR_ANIM_DURATION: Duration = Duration::from_millis(300);
 pub const ARE_DELAY: Duration = Duration::from_millis(100);
 

@@ -38,24 +38,24 @@ pub(crate) fn menu_item(label: &str, selected: bool, inner_w: usize) -> String {
 }
 
 pub(crate) fn settings_value(label: &str, value: &str, selected: bool, inner_w: usize) -> String {
-    let formatted = format!("{:>5}: < {:^4} >", label, value);
+    let formatted = format!("{:>5}:  < {:^4} >", label, value);
     centered_line(&formatted, selected, inner_w, false)
 }
 
 pub(crate) fn settings_toggle(label: &str, on: bool, selected: bool, inner_w: usize) -> String {
     let state = if on { "ON" } else { "OFF" };
-    let formatted = format!("{:>5}: {:<8}", label, state);
+    let formatted = format!("{:>5}:  < {:^4} >", label, state);
     centered_line(&formatted, selected, inner_w, false)
 }
 
 pub(crate) fn settings_value_dim(label: &str, value: &str, inner_w: usize) -> String {
-    let formatted = format!("{:>5}: {:<8}", label, value);
+    let formatted = format!("{:>5}:  < {:^4} >", label, value);
     centered_line(&formatted, false, inner_w, true)
 }
 
 pub(crate) fn settings_toggle_dim(label: &str, on: bool, inner_w: usize) -> String {
     let state = if on { "ON" } else { "OFF" };
-    let formatted = format!("{:>5}: {:<8}", label, state);
+    let formatted = format!("{:>5}:  < {:^4} >", label, state);
     centered_line(&formatted, false, inner_w, true)
 }
 
@@ -92,12 +92,12 @@ pub(crate) fn draw_title(stdout: &mut io::Stdout) -> io::Result<()> {
     const LETTERS: [(Color, [&str; 6]); 6] = [
         // T
         (Color::Red, [
-            "  ██████╗",
-            "  ╚═██╔═╝",
-            "    ██║  ",
-            "    ██║  ",
-            "    ██║  ",
-            "    ╚═╝  ",
+            "██████╗",
+            "╚═██╔═╝",
+            "  ██║  ",
+            "  ██║  ",
+            "  ██║  ",
+            "  ╚═╝  ",
         ]),
         // E
         (Color::DarkYellow, [
@@ -147,7 +147,7 @@ pub(crate) fn draw_title(stdout: &mut io::Stdout) -> io::Result<()> {
     ];
 
     for row in 0..6 {
-        write!(stdout, "  ")?;
+        write!(stdout, "    ")?;
         for (color, letter) in &LETTERS {
             write!(stdout, "{}", letter[row].with(*color))?;
         }

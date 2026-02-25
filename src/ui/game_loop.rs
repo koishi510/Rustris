@@ -7,7 +7,7 @@ use std::io;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::audio::{self, Sfx};
-use crate::game::{Game, GameMode, LastMove, ARE_DELAY, LOCK_DELAY};
+use crate::game::{Game, GameMode, LastMove, ARE_DELAY};
 use crate::records;
 use crate::render;
 use crate::settings::Settings;
@@ -261,7 +261,7 @@ pub fn run_game(
         } else {
             let gravity_remaining = game.drop_interval().saturating_sub(last_tick.elapsed());
             if let Some(lock_start) = game.lock_delay {
-                let lock_remaining = LOCK_DELAY.saturating_sub(lock_start.elapsed());
+                let lock_remaining = game.lock_delay_duration().saturating_sub(lock_start.elapsed());
                 gravity_remaining.min(lock_remaining)
             } else {
                 gravity_remaining
@@ -445,7 +445,7 @@ pub fn run_game(
                         if !game.in_are() {
                             let was_used = game.hold_used;
                             game.hold_piece();
-                            if !was_used {
+                            if !was_used && game.hold_used {
                                 if let Some(m) = music.as_ref() {
                                     m.play_sfx(Sfx::Hold);
                                 }
@@ -507,7 +507,7 @@ pub fn run_game(
         }
 
         if let Some(lock_start) = game.lock_delay {
-            if lock_start.elapsed() >= LOCK_DELAY {
+            if lock_start.elapsed() >= game.lock_delay_duration() {
                 game.lock_delay = None;
                 let prev_level = game.level;
                 game.lock_and_begin_clear();

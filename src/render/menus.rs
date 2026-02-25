@@ -202,7 +202,7 @@ pub fn draw_settings(
                 content.push(Some(settings_value_dim("Goal", &settings.marathon_goal.to_string(), inner_w)));
                 let cap_str = match settings.level_cap {
                     Some(c) => c.to_string(),
-                    None => "None".to_string(),
+                    None => "INF".to_string(),
                 };
                 content.push(Some(settings_value_dim("Cap", &cap_str, inner_w)));
             }
@@ -210,7 +210,7 @@ pub fn draw_settings(
                 content.push(Some(settings_value_dim("Level", &settings.level.to_string(), inner_w)));
                 let cap_str = match settings.level_cap {
                     Some(c) => c.to_string(),
-                    None => "None".to_string(),
+                    None => "INF".to_string(),
                 };
                 content.push(Some(settings_value_dim("Cap", &cap_str, inner_w)));
             }
@@ -223,9 +223,18 @@ pub fn draw_settings(
             }
         }
         content.push(Some(settings_value_dim("Next", &settings.next_count.to_string(), inner_w)));
+        let lock_str = format!("{:.1}s", settings.lock_delay_ms as f32 / 1000.0);
+        content.push(Some(settings_value_dim("Lock", &lock_str, inner_w)));
+        let reset_str = match settings.move_reset {
+            Some(n) => n.to_string(),
+            None => "INF".to_string(),
+        };
+        content.push(Some(settings_value_dim("Reset", &reset_str, inner_w)));
         content.push(Some(settings_toggle_dim("Ghost", settings.ghost, inner_w)));
         content.push(Some(settings_toggle_dim("Anim", settings.line_clear_anim, inner_w)));
         content.push(Some(settings_toggle_dim("Bag", settings.bag_randomizer, inner_w)));
+        content.push(Some(settings_toggle_dim("SRS", settings.srs, inner_w)));
+        content.push(Some(settings_toggle_dim("Hold", settings.hold_enabled, inner_w)));
         content.push(None);
         content.push(Some(settings_toggle("BGM", bgm_on, selected == 0, inner_w)));
         content.push(Some(settings_toggle("SFX", sfx_on, selected == 1, inner_w)));
@@ -238,7 +247,7 @@ pub fn draw_settings(
                 content.push(Some(settings_value("Goal", &settings.marathon_goal.to_string(), selected == 1, inner_w)));
                 let cap_str = match settings.level_cap {
                     Some(c) => c.to_string(),
-                    None => "None".to_string(),
+                    None => "INF".to_string(),
                 };
                 content.push(Some(settings_value("Cap", &cap_str, selected == 2, inner_w)));
             }
@@ -246,7 +255,7 @@ pub fn draw_settings(
                 content.push(Some(settings_value("Level", &settings.level.to_string(), selected == 0, inner_w)));
                 let cap_str = match settings.level_cap {
                     Some(c) => c.to_string(),
-                    None => "None".to_string(),
+                    None => "INF".to_string(),
                 };
                 content.push(Some(settings_value("Cap", &cap_str, selected == 1, inner_w)));
             }
@@ -260,14 +269,23 @@ pub fn draw_settings(
         }
 
         content.push(Some(settings_value("Next", &settings.next_count.to_string(), selected == mc, inner_w)));
-        content.push(Some(settings_toggle("Ghost", settings.ghost, selected == mc + 1, inner_w)));
-        content.push(Some(settings_toggle("Anim", settings.line_clear_anim, selected == mc + 2, inner_w)));
-        content.push(Some(settings_toggle("Bag", settings.bag_randomizer, selected == mc + 3, inner_w)));
+        let lock_str = format!("{:.1}s", settings.lock_delay_ms as f32 / 1000.0);
+        content.push(Some(settings_value("Lock", &lock_str, selected == mc + 1, inner_w)));
+        let reset_str = match settings.move_reset {
+            Some(n) => n.to_string(),
+            None => "INF".to_string(),
+        };
+        content.push(Some(settings_value("Reset", &reset_str, selected == mc + 2, inner_w)));
+        content.push(Some(settings_toggle("Ghost", settings.ghost, selected == mc + 3, inner_w)));
+        content.push(Some(settings_toggle("Anim", settings.line_clear_anim, selected == mc + 4, inner_w)));
+        content.push(Some(settings_toggle("Bag", settings.bag_randomizer, selected == mc + 5, inner_w)));
+        content.push(Some(settings_toggle("SRS", settings.srs, selected == mc + 6, inner_w)));
+        content.push(Some(settings_toggle("Hold", settings.hold_enabled, selected == mc + 7, inner_w)));
         content.push(None);
-        content.push(Some(settings_toggle("BGM", bgm_on, selected == mc + 4, inner_w)));
-        content.push(Some(settings_toggle("SFX", sfx_on, selected == mc + 5, inner_w)));
+        content.push(Some(settings_toggle("BGM", bgm_on, selected == mc + 8, inner_w)));
+        content.push(Some(settings_toggle("SFX", sfx_on, selected == mc + 9, inner_w)));
         content.push(None);
-        content.push(Some(menu_item("Back", selected == mc + 6, inner_w)));
+        content.push(Some(menu_item("Back", selected == mc + 10, inner_w)));
     }
 
     draw_full_board_overlay(stdout, &content)

@@ -47,12 +47,12 @@ cargo run --release
 
 ## Features
 
-- **Super Rotation System (SRS)** with full wall kick tables
+- **Super Rotation System (SRS)** with full wall kick tables (toggleable)
 - **7-bag randomizer** (or pure random)
-- **Hold piece** (once per drop)
-- **Next queue** preview (1-6 pieces, configurable)
+- **Hold piece** (toggleable)
+- **Next queue** preview (0-6 pieces, configurable)
 - **Ghost piece** (toggleable)
-- **Lock delay** (0.5s) with move/rotate reset
+- **Lock delay** (0-2s, configurable) with move/rotate reset (0-30 or unlimited)
 - **DAS/ARR** input handling
 - **Line clear animation** (toggleable)
 - **Guideline scoring** - T-Spin (Mini/Full), Back-to-Back, Combo, All Clear
@@ -62,17 +62,23 @@ cargo run --release
 
 ## Settings
 
-Each mode has its own configurable parameters:
-
-| Setting   | Modes             | Range             |
-| --------- | ----------------- | ----------------- |
-| Level     | Marathon, Endless | 1-20              |
-| Goal      | Marathon          | 10-300 (step 10)  |
-| Goal      | Sprint            | 10-100 (step 10)  |
-| Time      | Ultra             | 30-300s (step 10) |
-| Level Cap | Marathon, Endless | 1-20 or None      |
-
-Shared settings: Next count, Ghost, Line clear animation, Bag randomizer, BGM, SFX.
+| Setting   | Modes             | Range              | Default | Description                          |
+| --------- | ----------------- | ------------------ | ------- | ------------------------------------ |
+| Level     | Marathon, Endless | 1-20               | 1       | Starting level                       |
+| Goal      | Marathon          | 10-300 (step 10)   | 150     | Lines to clear                       |
+| Goal      | Sprint            | 10-100 (step 10)   | 40      | Lines to clear                       |
+| Time      | Ultra             | 30-300s (step 10)  | 120s    | Time limit                           |
+| Cap       | Marathon, Endless | 1-20 / INF         | 15      | Maximum level                        |
+| Next      | All               | 0-6                | 6       | Next queue preview count             |
+| Lock      | All               | 0.0-2.0s (step 0.1)| 0.5s   | Lock delay before piece locks        |
+| Reset     | All               | 0-30 / INF         | 15      | Move reset limit during lock delay   |
+| Ghost     | All               | ON / OFF           | ON      | Ghost piece visibility               |
+| Anim      | All               | ON / OFF           | ON      | Line clear animation                 |
+| Bag       | All               | ON / OFF           | ON      | 7-bag randomizer (OFF = pure random) |
+| SRS       | All               | ON / OFF           | ON      | Super Rotation System with wall kicks |
+| Hold      | All               | ON / OFF           | ON      | Hold piece                           |
+| BGM       | All               | ON / OFF           | ON      | Background music                     |
+| SFX       | All               | ON / OFF           | ON      | Sound effects                        |
 
 ## Project Structure
 

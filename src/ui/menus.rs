@@ -64,13 +64,29 @@ pub(crate) fn adjust_setting(settings: &mut Settings, sel: usize, direction: i32
         }
     } else if sel == mc {
         let v = settings.next_count as i32 + direction;
-        settings.next_count = v.clamp(1, MAX_NEXT_COUNT as i32) as usize;
+        settings.next_count = v.clamp(0, MAX_NEXT_COUNT as i32) as usize;
     } else if sel == mc + 1 {
-        settings.ghost = !settings.ghost;
+        let v = settings.lock_delay_ms as i32 + direction * 100;
+        settings.lock_delay_ms = v.clamp(0, 2000) as u32;
     } else if sel == mc + 2 {
-        settings.line_clear_anim = !settings.line_clear_anim;
+        match (settings.move_reset, direction) {
+            (Some(n), 1) if n >= 30 => settings.move_reset = None,
+            (Some(n), 1) => settings.move_reset = Some((n + 1).min(30)),
+            (Some(n), -1) if n == 0 => {}
+            (Some(n), -1) => settings.move_reset = Some(n - 1),
+            (None, -1) => settings.move_reset = Some(30),
+            _ => {}
+        }
     } else if sel == mc + 3 {
+        settings.ghost = !settings.ghost;
+    } else if sel == mc + 4 {
+        settings.line_clear_anim = !settings.line_clear_anim;
+    } else if sel == mc + 5 {
         settings.bag_randomizer = !settings.bag_randomizer;
+    } else if sel == mc + 6 {
+        settings.srs = !settings.srs;
+    } else if sel == mc + 7 {
+        settings.hold_enabled = !settings.hold_enabled;
     }
 }
 
@@ -105,17 +121,32 @@ pub(crate) fn run_settings(
                             m.play_sfx(Sfx::MenuMove);
                         }
                     }
-                    KeyCode::Enter => match sel {
+                    KeyCode::Left | KeyCode::Right => match sel {
                         0 => {
                             if let Some(m) = music.as_mut() {
                                 m.toggle_bgm();
-                                m.play_sfx(Sfx::Toggle);
+                                m.play_sfx(Sfx::MenuMove);
                             }
                         }
                         1 => {
                             if let Some(m) = music.as_mut() {
                                 m.toggle_sfx();
-                                m.play_sfx(Sfx::Toggle);
+                                m.play_sfx(Sfx::MenuMove);
+                            }
+                        }
+                        _ => {}
+                    },
+                    KeyCode::Enter => match sel {
+                        0 => {
+                            if let Some(m) = music.as_mut() {
+                                m.toggle_bgm();
+                                m.play_sfx(Sfx::MenuMove);
+                            }
+                        }
+                        1 => {
+                            if let Some(m) = music.as_mut() {
+                                m.toggle_sfx();
+                                m.play_sfx(Sfx::MenuMove);
                             }
                         }
                         2 => {
@@ -143,13 +174,13 @@ pub(crate) fn run_settings(
         GameMode::Endless => 2,
         GameMode::Sprint | GameMode::Ultra => 1,
     };
-    let count = mc + 7;
-    let idx_bgm = mc + 4;
-    let idx_sfx = mc + 5;
-    let idx_back = mc + 6;
+    let count = mc + 11;
+    let idx_bgm = mc + 8;
+    let idx_sfx = mc + 9;
+    let idx_back = mc + 10;
 
     let is_toggle = |s: usize| -> bool {
-        s == mc + 1 || s == mc + 2 || s == mc + 3
+        s > mc + 2 && s <= mc + 7
     };
 
     loop {
@@ -172,18 +203,21 @@ pub(crate) fn run_settings(
                         m.play_sfx(Sfx::MenuMove);
                     }
                 }
-                KeyCode::Left => {
+                KeyCode::Left | KeyCode::Right => {
+                    let dir = if code == KeyCode::Left { -1 } else { 1 };
                     if sel < idx_bgm {
-                        adjust_setting(settings, sel, -1, mode);
+                        adjust_setting(settings, sel, dir, mode);
                         if let Some(m) = music.as_ref() {
                             m.play_sfx(Sfx::MenuMove);
                         }
-                    }
-                }
-                KeyCode::Right => {
-                    if sel < idx_bgm {
-                        adjust_setting(settings, sel, 1, mode);
-                        if let Some(m) = music.as_ref() {
+                    } else if sel == idx_bgm {
+                        if let Some(m) = music.as_mut() {
+                            m.toggle_bgm();
+                            m.play_sfx(Sfx::MenuMove);
+                        }
+                    } else if sel == idx_sfx {
+                        if let Some(m) = music.as_mut() {
+                            m.toggle_sfx();
                             m.play_sfx(Sfx::MenuMove);
                         }
                     }
@@ -192,17 +226,17 @@ pub(crate) fn run_settings(
                     if is_toggle(sel) {
                         adjust_setting(settings, sel, 0, mode);
                         if let Some(m) = music.as_ref() {
-                            m.play_sfx(Sfx::Toggle);
+                            m.play_sfx(Sfx::MenuMove);
                         }
                     } else if sel == idx_bgm {
                         if let Some(m) = music.as_mut() {
                             m.toggle_bgm();
-                            m.play_sfx(Sfx::Toggle);
+                            m.play_sfx(Sfx::MenuMove);
                         }
                     } else if sel == idx_sfx {
                         if let Some(m) = music.as_mut() {
                             m.toggle_sfx();
-                            m.play_sfx(Sfx::Toggle);
+                            m.play_sfx(Sfx::MenuMove);
                         }
                     } else if sel == idx_back {
                         if let Some(m) = music.as_ref() {
