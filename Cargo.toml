@@ -1,9 +1,14 @@
 [package]
 name = "rustris"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
-description = "A Tetris game written in Rust."
+rust-version = "1.85"
+description = "A guideline-compliant terminal Tetris written in Rust"
 license = "GPL-3.0"
+repository = "https://github.com/koishi510/Rustris"
+readme = "README.md"
+keywords = ["tetris", "terminal", "game", "tui"]
+categories = ["games"]
 
 [dependencies]
 crossterm = "0.28"
