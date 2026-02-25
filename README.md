@@ -3,8 +3,8 @@
 [![Build](https://img.shields.io/github/actions/workflow/status/koishi510/Rustris/rust.yml?branch=main&style=flat-square&logo=github&logoColor=white)](https://github.com/koishi510/Rustris/actions/workflows/rust.yml)
 [![Crates.io](https://img.shields.io/crates/v/rustris?style=flat-square&logo=rust&logoColor=white)](https://crates.io/crates/rustris)
 [![Release](https://img.shields.io/github/v/release/koishi510/Rustris?style=flat-square&logo=github&logoColor=white)](https://github.com/koishi510/Rustris/releases)
-[![License](https://img.shields.io/badge/license-GPL--3.0-green?style=flat-square&logo=opensourceinitiative&logoColor=white)](./LICENSE)
-[![MSRV](https://img.shields.io/badge/MSRV-1.85-orange?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![License](https://img.shields.io/badge/License-GPL--3.0-green?style=flat-square&logo=opensourceinitiative&logoColor=white)](./LICENSE)
+[![Rust](https://img.shields.io/badge/Rust-1.85-orange?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 
 A guideline-compliant terminal Tetris written in Rust.
 
