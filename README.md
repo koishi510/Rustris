@@ -1,6 +1,7 @@
 # Rustris
 
-[![Rust](https://github.com/koishi510/Rustris/actions/workflows/rust.yml/badge.svg)](https://github.com/koishi510/Rustris/actions/workflows/rust.yml)
+[![Build](https://img.shields.io/github/actions/workflow/status/koishi510/Rustris/rust.yml?branch=main&style=flat-square&logo=github)](https://github.com/koishi510/Rustris/actions/workflows/rust.yml)
+[![Release](https://img.shields.io/github/v/release/koishi510/Rustris?style=flat-square)](https://github.com/koishi510/Rustris/releases)
 [![Rust](https://img.shields.io/badge/Rust-2024_edition-orange?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-GPL--3.0-green?style=flat-square)](./LICENSE)
 
