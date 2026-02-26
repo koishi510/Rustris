@@ -1,8 +1,11 @@
 use rodio::source::Source;
 use rodio::{OutputStream, Sink};
-use std::os::unix::io::{AsRawFd, RawFd};
 use std::time::Duration;
 
+#[cfg(unix)]
+use std::os::unix::io::{AsRawFd, RawFd};
+
+#[cfg(unix)]
 fn suppress_stderr() -> RawFd {
     let devnull = std::fs::File::open("/dev/null").ok();
     let saved = unsafe { libc_dup(2) };
@@ -12,6 +15,7 @@ fn suppress_stderr() -> RawFd {
     saved
 }
 
+#[cfg(unix)]
 fn restore_stderr(saved: RawFd) {
     if saved >= 0 {
         unsafe {
@@ -21,17 +25,33 @@ fn restore_stderr(saved: RawFd) {
     }
 }
 
+#[cfg(unix)]
 unsafe fn libc_dup(fd: RawFd) -> RawFd {
     unsafe extern "C" { fn dup(fd: i32) -> i32; }
     unsafe { dup(fd) }
 }
+#[cfg(unix)]
 unsafe fn libc_dup2(oldfd: RawFd, newfd: RawFd) -> RawFd {
     unsafe extern "C" { fn dup2(oldfd: i32, newfd: i32) -> i32; }
     unsafe { dup2(oldfd, newfd) }
 }
+#[cfg(unix)]
 unsafe fn libc_close(fd: RawFd) -> i32 {
     unsafe extern "C" { fn close(fd: i32) -> i32; }
     unsafe { close(fd) }
+}
+
+#[cfg(unix)]
+fn init_output_stream() -> Option<(OutputStream, rodio::OutputStreamHandle)> {
+    let saved = suppress_stderr();
+    let result = OutputStream::try_default().ok();
+    restore_stderr(saved);
+    result
+}
+
+#[cfg(not(unix))]
+fn init_output_stream() -> Option<(OutputStream, rodio::OutputStreamHandle)> {
+    OutputStream::try_default().ok()
 }
 
 const SAMPLE_RATE: u32 = 44100;
@@ -336,11 +356,7 @@ pub struct MusicPlayer {
 
 impl MusicPlayer {
     pub fn new() -> Option<Self> {
-        let saved_stderr = suppress_stderr();
-        let result = OutputStream::try_default().ok();
-        restore_stderr(saved_stderr);
-
-        let (stream, stream_handle) = result?;
+        let (stream, stream_handle) = init_output_stream()?;
         let sink = Sink::try_new(&stream_handle).ok()?;
         let sfx_sink = Sink::try_new(&stream_handle).ok()?;
         sink.pause();
