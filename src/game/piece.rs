@@ -10,7 +10,6 @@ pub const MAX_NEXT_COUNT: usize = 6;
 pub const KIND_O: usize = 1;
 pub const KIND_T: usize = 2;
 
-// SRS rotation states: 7 pieces x 4 rotations, each cell is [row, col] offset
 pub const PIECE_STATES: [[[[i32; 2]; 4]; 4]; 7] = [
     // I
     [
@@ -63,7 +62,6 @@ pub const PIECE_STATES: [[[[i32; 2]; 4]; 4]; 7] = [
     ],
 ];
 
-// T-Spin detection: front/back corner offsets relative to T center
 pub const T_FRONT_CORNERS: [[[i32; 2]; 2]; 4] = [
     [[-1, -1], [-1, 1]],  // 0
     [[-1, 1], [1, 1]],    // R
@@ -77,7 +75,6 @@ pub const T_BACK_CORNERS: [[[i32; 2]; 2]; 4] = [
     [[-1, 1], [1, 1]],    // L
 ];
 
-// SRS wall kick tables: [dc, dr] offsets
 pub const KICK_JLTSZ: [[[i32; 2]; 5]; 8] = [
     [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
     [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
@@ -176,5 +173,81 @@ impl Bag {
             self.queue = bag;
         }
         self.queue.pop().unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn kick_index_all_transitions() {
+        assert_eq!(kick_index(0, 1), 0);
+        assert_eq!(kick_index(1, 0), 1);
+        assert_eq!(kick_index(1, 2), 2);
+        assert_eq!(kick_index(2, 1), 3);
+        assert_eq!(kick_index(2, 3), 4);
+        assert_eq!(kick_index(3, 2), 5);
+        assert_eq!(kick_index(3, 0), 6);
+        assert_eq!(kick_index(0, 3), 7);
+    }
+
+    #[test]
+    fn piece_new_i_spawn() {
+        let p = Piece::new(0);
+        assert_eq!(p.kind, 0);
+        assert_eq!(p.rotation, 0);
+        assert_eq!(p.row, 0);
+        assert_eq!(p.col, (BOARD_WIDTH as i32) / 2 - 1);
+    }
+
+    #[test]
+    fn piece_new_o_spawn() {
+        let p = Piece::new(KIND_O);
+        assert_eq!(p.row, -1);
+        assert_eq!(p.col, (BOARD_WIDTH as i32) / 2 - 1);
+    }
+
+    #[test]
+    fn piece_new_t_spawn() {
+        let p = Piece::new(KIND_T);
+        assert_eq!(p.row, 0);
+        assert_eq!(p.col, (BOARD_WIDTH as i32) / 2 - 1);
+    }
+
+    #[test]
+    fn bag_7bag_completeness() {
+        let mut bag = Bag::new(true);
+        let mut counts = [0u32; 7];
+        for _ in 0..7 {
+            let kind = bag.next();
+            assert!(kind < 7);
+            counts[kind] += 1;
+        }
+        for count in counts {
+            assert_eq!(count, 1);
+        }
+    }
+
+    #[test]
+    fn bag_7bag_two_cycles() {
+        let mut bag = Bag::new(true);
+        let mut counts = [0u32; 7];
+        for _ in 0..14 {
+            let kind = bag.next();
+            counts[kind] += 1;
+        }
+        for count in counts {
+            assert_eq!(count, 2);
+        }
+    }
+
+    #[test]
+    fn bag_random_mode() {
+        let mut bag = Bag::new(false);
+        for _ in 0..100 {
+            let kind = bag.next();
+            assert!(kind < 7);
+        }
     }
 }

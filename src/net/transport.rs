@@ -1,7 +1,10 @@
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
+use std::time::Duration;
 
 use super::protocol::NetMessage;
+
+const MAX_MESSAGE_LEN: usize = 64 * 1024;
 
 pub struct Connection {
     stream: TcpStream,
@@ -25,6 +28,16 @@ impl Connection {
         self.stream.write_all(&len.to_be_bytes())?;
         self.stream.write_all(payload)?;
         self.stream.flush()?;
+        Ok(())
+    }
+
+    fn check_length(len: usize) -> io::Result<()> {
+        if len > MAX_MESSAGE_LEN {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("message too large: {} bytes", len),
+            ));
+        }
         Ok(())
     }
 
@@ -55,6 +68,8 @@ impl Connection {
             self.read_buf[3],
         ]) as usize;
 
+        Self::check_length(len)?;
+
         if self.read_buf.len() < 4 + len {
             return Ok(None);
         }
@@ -67,6 +82,8 @@ impl Connection {
 
     pub fn recv_blocking(&mut self) -> io::Result<NetMessage> {
         self.stream.set_nonblocking(false)?;
+        self.stream
+            .set_read_timeout(Some(Duration::from_secs(10)))?;
         let result = loop {
             match self.try_recv_blocking_inner() {
                 Ok(Some(msg)) => break Ok(msg),
@@ -74,6 +91,7 @@ impl Connection {
                 Err(e) => break Err(e),
             }
         };
+        let _ = self.stream.set_read_timeout(None);
         let _ = self.stream.set_nonblocking(true);
         result
     }
@@ -103,6 +121,8 @@ impl Connection {
             self.read_buf[2],
             self.read_buf[3],
         ]) as usize;
+
+        Self::check_length(len)?;
 
         if self.read_buf.len() < 4 + len {
             return Ok(None);

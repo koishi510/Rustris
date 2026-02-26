@@ -7,7 +7,7 @@ use crate::audio::{self, Sfx};
 use crate::game::garbage::{calculate_attack, GarbageEvent, GarbageQueue};
 use crate::game::{Game, GameMode};
 use crate::net::transport::Connection;
-use crate::net::{BoardSnapshot, GarbageAttack, MatchOutcome, NetMessage};
+use crate::net::{BoardSnapshot, GarbageAttack, MatchOutcome, NetMessage, PROTOCOL_VERSION};
 use crate::game::piece::*;
 use crate::render;
 use crate::game::settings::{Settings, VersusSettings};
@@ -17,33 +17,40 @@ use super::{menu_nav, play_menu_sfx, read_key};
 
 const BOARD_SYNC_INTERVAL: Duration = Duration::from_millis(66);
 
-fn make_board_snapshot(game: &Game, pending_garbage: u32) -> BoardSnapshot {
-    let mut board = Vec::with_capacity(BOARD_WIDTH * BOARD_HEIGHT);
-    for row in 0..BOARD_HEIGHT {
-        for col in 0..BOARD_WIDTH {
-            board.push(game.board[row][col]);
+fn perform_handshake(conn: &mut Connection, is_host: bool) -> io::Result<()> {
+    if is_host {
+        conn.send(&NetMessage::Hello { version: PROTOCOL_VERSION })?;
+        let msg = conn.recv_blocking()?;
+        match msg {
+            NetMessage::Hello { version } if version == PROTOCOL_VERSION => Ok(()),
+            NetMessage::Hello { version } => Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("protocol version mismatch: local={}, remote={}", PROTOCOL_VERSION, version),
+            )),
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "expected Hello",
+            )),
         }
-    }
-
-    let current_cells = if game.is_animating() || game.in_are() {
-        vec![]
     } else {
-        game.current.cells().to_vec()
-    };
-
-    let current_kind = game.current.kind;
-
-    BoardSnapshot {
-        board,
-        current_cells,
-        current_kind,
-        score: game.score,
-        lines: game.lines,
-        pending_garbage,
+        let msg = conn.recv_blocking()?;
+        match msg {
+            NetMessage::Hello { version } if version == PROTOCOL_VERSION => {
+                conn.send(&NetMessage::Hello { version: PROTOCOL_VERSION })?;
+                Ok(())
+            }
+            NetMessage::Hello { version } => Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("protocol version mismatch: local={}, remote={}", PROTOCOL_VERSION, version),
+            )),
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "expected Hello",
+            )),
+        }
     }
 }
 
-/// Host lobby: wait for client connection
 pub fn run_host_lobby(
     stdout: &mut io::Stdout,
     music: &mut Option<audio::MusicPlayer>,
@@ -73,12 +80,36 @@ pub fn run_host_lobby(
 
         match crate::net::host::try_accept(&listener) {
             Ok(Some(mut conn)) => {
-                let vs = VersusSettings::from_settings(settings);
-                conn.send(&NetMessage::LobbySettings(vs))?;
-
                 render::versus::draw_lobby_screen(
                     stdout, "HOST GAME", &["Connected!", "Starting..."], "", &[], 0,
                 )?;
+
+                if let Err(e) = perform_handshake(&mut conn, true) {
+                    let error_msg = format!("{}", e);
+                    let mut sel: usize = 0;
+                    let count: usize = 1;
+                    loop {
+                        render::versus::draw_lobby_screen(
+                            stdout, "HOST GAME", &["Handshake failed"], &error_msg, &["Back"], sel,
+                        )?;
+                        if let Some(code) = read_key()? {
+                            match code {
+                                KeyCode::Up | KeyCode::Down => {
+                                    sel = menu_nav(sel, count, code);
+                                    play_menu_sfx(music, Sfx::MenuMove);
+                                }
+                                KeyCode::Enter | KeyCode::Esc => {
+                                    play_menu_sfx(music, Sfx::MenuBack);
+                                    return Ok(None);
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+
+                let vs = VersusSettings::from_settings(settings);
+                conn.send(&NetMessage::LobbySettings(vs))?;
 
                 let msg = conn.recv_blocking()?;
                 match msg {
@@ -148,6 +179,30 @@ pub fn run_client_lobby(
         stdout, "JOIN GAME", &["Connected!", "Starting..."], "", &[], 0,
     )?;
 
+    if let Err(e) = perform_handshake(&mut conn, false) {
+        let error_msg = format!("{}", e);
+        let mut sel: usize = 0;
+        let count: usize = 1;
+        loop {
+            render::versus::draw_lobby_screen(
+                stdout, "JOIN GAME", &["Handshake failed"], &error_msg, &["Back"], sel,
+            )?;
+            if let Some(code) = read_key()? {
+                match code {
+                    KeyCode::Up | KeyCode::Down => {
+                        sel = menu_nav(sel, count, code);
+                        play_menu_sfx(music, Sfx::MenuMove);
+                    }
+                    KeyCode::Enter | KeyCode::Esc => {
+                        play_menu_sfx(music, Sfx::MenuBack);
+                        return Ok(None);
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
     let msg = conn.recv_blocking()?;
     let vs = match msg {
         NetMessage::LobbySettings(vs) => vs,
@@ -166,7 +221,6 @@ pub fn run_client_lobby(
     Ok(Some((conn, vs)))
 }
 
-/// Run the countdown sequence
 fn run_countdown(
     stdout: &mut io::Stdout,
     conn: &mut Connection,
@@ -182,7 +236,6 @@ fn run_countdown(
         }
         conn.send(&NetMessage::GameStart)?;
     } else {
-        // Show waiting screen while host hasn't sent countdown yet
         render::versus::draw_versus_countdown(stdout, 0)?;
         loop {
             let msg = conn.recv_blocking()?;
@@ -200,7 +253,6 @@ fn run_countdown(
     Ok(true)
 }
 
-/// Main versus game loop
 pub fn run_versus(
     stdout: &mut io::Stdout,
     music: &mut Option<audio::MusicPlayer>,
@@ -240,15 +292,7 @@ pub fn run_versus(
                 }
             }
 
-            if we_died && opponent_dead {
-                break;
-            }
-
-            if we_died && !opponent_dead {
-                break;
-            }
-
-            if opponent_dead && !we_died {
+            if we_died || opponent_dead {
                 break;
             }
 
@@ -262,7 +306,7 @@ pub fn run_versus(
             )?;
 
             if last_board_sync.elapsed() >= BOARD_SYNC_INTERVAL {
-                let snap = make_board_snapshot(&game, garbage_queue.total_pending());
+                let snap = BoardSnapshot::from_game(&game, garbage_queue.total_pending());
                 let _ = conn.send(&NetMessage::BoardState(snap));
                 last_board_sync = Instant::now();
             }
@@ -321,6 +365,25 @@ pub fn run_versus(
                     inp.last_tick = Instant::now();
                     continue;
                 }
+            }
+
+            if game.is_garbage_animating() {
+                if game.update_garbage_animation() {
+                    if let Some(m) = music.as_ref() {
+                        m.play_sfx(Sfx::GarbageReceived);
+                    }
+                    render::versus::draw_versus(
+                        stdout,
+                        &game,
+                        &opponent_snapshot,
+                        garbage_queue.total_pending(),
+                    )?;
+                    if event::poll(Duration::from_millis(16))? {
+                        let _ = read_key()?;
+                    }
+                    continue;
+                }
+                inp.last_tick = Instant::now();
             }
 
             let mut timeout = input::compute_timeout(&game, &inp);
@@ -389,11 +452,9 @@ pub fn run_versus(
                             let hard_dropped = input::handle_game_key(other, &mut game, &mut inp, music);
                             if hard_dropped {
                                 process_post_lock(
-                                    stdout,
                                     &mut game,
                                     &mut garbage_queue,
                                     conn,
-                                    &opponent_snapshot,
                                     music,
                                 )?;
                             }
@@ -409,7 +470,7 @@ pub fn run_versus(
 
             let locked = input::update_game_timers(&mut game, &mut inp, music);
             if locked {
-                process_post_lock(stdout, &mut game, &mut garbage_queue, conn, &opponent_snapshot, music)?;
+                process_post_lock(&mut game, &mut garbage_queue, conn, music)?;
             }
         }
 
@@ -450,11 +511,9 @@ pub fn run_versus(
 }
 
 fn process_post_lock(
-    stdout: &mut io::Stdout,
     game: &mut Game,
     garbage_queue: &mut GarbageQueue,
     conn: &mut Connection,
-    opponent_snapshot: &Option<BoardSnapshot>,
     music: &Option<audio::MusicPlayer>,
 ) -> io::Result<()> {
     if let Some(action) = &game.last_action {
@@ -472,38 +531,24 @@ fn process_post_lock(
                 }
             }
         } else {
-            apply_pending_garbage(stdout, game, garbage_queue, opponent_snapshot, music)?;
+            apply_pending_garbage(game, garbage_queue, music);
         }
     } else {
-        apply_pending_garbage(stdout, game, garbage_queue, opponent_snapshot, music)?;
+        apply_pending_garbage(game, garbage_queue, music);
     }
     Ok(())
 }
 
-const GARBAGE_RISE_INTERVAL: Duration = Duration::from_millis(40);
-
 fn apply_pending_garbage(
-    stdout: &mut io::Stdout,
     game: &mut Game,
     garbage_queue: &mut GarbageQueue,
-    opponent_snapshot: &Option<BoardSnapshot>,
-    music: &Option<audio::MusicPlayer>,
-) -> io::Result<()> {
+    _music: &Option<audio::MusicPlayer>,
+) {
     let events = garbage_queue.drain_all();
     if events.is_empty() {
-        return Ok(());
+        return;
     }
-    for event in events {
-        for _ in 0..event.lines {
-            if let Some(m) = music.as_ref() {
-                m.play_sfx(Sfx::GarbageReceived);
-            }
-            game.receive_garbage(1, event.hole_column);
-            render::versus::draw_versus(stdout, game, opponent_snapshot, garbage_queue.total_pending())?;
-            std::thread::sleep(GARBAGE_RISE_INTERVAL);
-        }
-    }
-    Ok(())
+    game.begin_garbage_rise(events);
 }
 
 enum ResultAction {

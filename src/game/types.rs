@@ -35,6 +35,12 @@ pub enum LastMove {
     Move,
 }
 
+pub struct GarbageRiseAnimation {
+    pub events: Vec<(u32, usize)>,
+    pub started_at: Instant,
+    pub lines_applied: u32,
+}
+
 #[derive(Clone)]
 pub struct ClearAction {
     pub label: String,

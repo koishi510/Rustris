@@ -9,6 +9,9 @@ use std::time::{Duration, Instant};
 
 use crate::game::piece::*;
 use crate::game::settings::Settings;
+use crate::game::garbage::GarbageEvent;
+
+const GARBAGE_RISE_INTERVAL_MS: u64 = 40;
 
 pub struct Game {
     pub board: [[u8; BOARD_WIDTH]; BOARD_HEIGHT],
@@ -46,6 +49,7 @@ pub struct Game {
     pub lock_delay_ms: u32,
     pub move_reset: Option<u32>,
     pub move_reset_count: u32,
+    pub garbage_rise_anim: Option<GarbageRiseAnimation>,
 }
 
 impl Game {
@@ -97,6 +101,7 @@ impl Game {
             lock_delay_ms: settings.lock_delay_ms,
             move_reset: settings.move_reset,
             move_reset_count: 0,
+            garbage_rise_anim: None,
         }
     }
 
@@ -650,15 +655,272 @@ impl Game {
         if lines == 0 {
             return;
         }
-        // Shift entire board up by `lines` rows
         for r in 0..BOARD_HEIGHT.saturating_sub(lines) {
             self.board[r] = self.board[r + lines];
         }
-        // Fill bottom rows with garbage (GARBAGE_CELL except hole column)
         for r in BOARD_HEIGHT.saturating_sub(lines)..BOARD_HEIGHT {
             for c in 0..BOARD_WIDTH {
                 self.board[r][c] = if c == hole_column { EMPTY } else { GARBAGE_CELL };
             }
         }
+    }
+
+    pub fn begin_garbage_rise(&mut self, events: Vec<GarbageEvent>) {
+        if events.is_empty() {
+            return;
+        }
+        let anim_events: Vec<(u32, usize)> = events
+            .into_iter()
+            .map(|e| (e.lines, e.hole_column))
+            .collect();
+        self.garbage_rise_anim = Some(GarbageRiseAnimation {
+            events: anim_events,
+            started_at: Instant::now(),
+            lines_applied: 0,
+        });
+    }
+
+    pub fn is_garbage_animating(&self) -> bool {
+        self.garbage_rise_anim.is_some()
+    }
+
+    pub fn update_garbage_animation(&mut self) -> bool {
+        let anim = match self.garbage_rise_anim.as_ref() {
+            Some(a) => a,
+            None => return false,
+        };
+
+        let elapsed_ms = anim.started_at.elapsed().as_millis() as u64;
+        let target_lines = (elapsed_ms / GARBAGE_RISE_INTERVAL_MS) as u32;
+
+        let mut total_lines: u32 = 0;
+        for (lines, _) in &anim.events {
+            total_lines += lines;
+        }
+
+        let lines_to_apply = target_lines.min(total_lines);
+        let already_applied = anim.lines_applied;
+
+        if lines_to_apply <= already_applied {
+            return lines_to_apply < total_lines;
+        }
+
+        let mut applied_so_far: u32 = 0;
+        let events_snapshot: Vec<(u32, usize)> = anim.events.clone();
+
+        for (event_lines, hole) in &events_snapshot {
+            let event_start = applied_so_far;
+            let event_end = applied_so_far + event_lines;
+            applied_so_far = event_end;
+
+            if event_end <= already_applied {
+                continue;
+            }
+
+            let start_in_event = already_applied.saturating_sub(event_start);
+            let end_in_event = (lines_to_apply - event_start).min(*event_lines);
+
+            for _ in start_in_event..end_in_event {
+                self.receive_garbage(1, *hole);
+            }
+
+            if applied_so_far >= lines_to_apply {
+                break;
+            }
+        }
+
+        self.garbage_rise_anim.as_mut().unwrap().lines_applied = lines_to_apply;
+
+        if lines_to_apply >= total_lines {
+            self.garbage_rise_anim = None;
+            return false;
+        }
+
+        true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::settings::Settings;
+
+    fn test_settings() -> Settings {
+        Settings {
+            line_clear_anim: false,
+            ..Settings::default()
+        }
+    }
+
+    fn make_game() -> Game {
+        Game::new(GameMode::Versus, &test_settings())
+    }
+
+    #[test]
+    fn fits_empty_board() {
+        let game = make_game();
+        let piece = Piece::new(0);
+        assert!(game.fits(&piece));
+    }
+
+    #[test]
+    fn fits_occupied_cell() {
+        let mut game = make_game();
+        let p = Piece::new(KIND_T);
+        let cells = p.cells();
+        let (r, c) = cells.iter().find(|&&(r, _)| r >= 0).unwrap();
+        game.board[*r as usize][*c as usize] = 1;
+        assert!(!game.fits(&p));
+    }
+
+    #[test]
+    fn fits_out_of_bounds_left() {
+        let game = make_game();
+        let mut piece = Piece::new(0);
+        piece.col = -5;
+        assert!(!game.fits(&piece));
+    }
+
+    #[test]
+    fn fits_out_of_bounds_right() {
+        let game = make_game();
+        let mut piece = Piece::new(0);
+        piece.col = BOARD_WIDTH as i32;
+        assert!(!game.fits(&piece));
+    }
+
+    #[test]
+    fn fits_out_of_bounds_bottom() {
+        let game = make_game();
+        let mut piece = Piece::new(0);
+        piece.row = BOARD_HEIGHT as i32;
+        assert!(!game.fits(&piece));
+    }
+
+    #[test]
+    fn receive_garbage_bottom_rows() {
+        let mut game = make_game();
+        game.receive_garbage(2, 3);
+        for r in (BOARD_HEIGHT - 2)..BOARD_HEIGHT {
+            for c in 0..BOARD_WIDTH {
+                if c == 3 {
+                    assert_eq!(game.board[r][c], EMPTY);
+                } else {
+                    assert_eq!(game.board[r][c], GARBAGE_CELL);
+                }
+            }
+        }
+        for c in 0..BOARD_WIDTH {
+            assert_eq!(game.board[0][c], EMPTY);
+        }
+    }
+
+    #[test]
+    fn receive_garbage_shifts_up() {
+        let mut game = make_game();
+        game.board[BOARD_HEIGHT - 1][0] = 5;
+        game.receive_garbage(1, 0);
+        assert_eq!(game.board[BOARD_HEIGHT - 2][0], 5);
+        assert_eq!(game.board[BOARD_HEIGHT - 1][0], EMPTY);
+        assert_eq!(game.board[BOARD_HEIGHT - 1][1], GARBAGE_CELL);
+    }
+
+    #[test]
+    fn receive_garbage_zero_noop() {
+        let mut game = make_game();
+        let board_before = game.board;
+        game.receive_garbage(0, 0);
+        assert_eq!(game.board, board_before);
+    }
+
+    fn setup_full_rows(game: &mut Game, count: usize) {
+        for r in (BOARD_HEIGHT - count)..BOARD_HEIGHT {
+            for c in 0..BOARD_WIDTH {
+                game.board[r][c] = 1;
+            }
+        }
+    }
+
+    #[test]
+    fn scoring_single() {
+        let mut game = make_game();
+        setup_full_rows(&mut game, 1);
+        game.current = Piece::new(0);
+        game.current.row = (BOARD_HEIGHT as i32) - 2;
+        game.current.col = 0;
+        game.lock_and_begin_clear();
+        assert!(game.score >= 100);
+    }
+
+    #[test]
+    fn scoring_tetris() {
+        let mut game = make_game();
+        setup_full_rows(&mut game, 4);
+        game.current = Piece::new(0);
+        game.current.row = (BOARD_HEIGHT as i32) - 5;
+        game.lock_and_begin_clear();
+        assert!(game.score >= 800);
+        assert_eq!(game.lines, 4);
+    }
+
+    #[test]
+    fn scoring_b2b_tetris() {
+        let mut game = make_game();
+        game.back_to_back = true;
+        setup_full_rows(&mut game, 4);
+        game.current = Piece::new(0);
+        game.current.row = (BOARD_HEIGHT as i32) - 5;
+        game.lock_and_begin_clear();
+        assert!(game.score >= 1200);
+    }
+
+    #[test]
+    fn scoring_combo() {
+        let mut game = make_game();
+        game.combo = 1;
+        setup_full_rows(&mut game, 1);
+        game.current = Piece::new(0);
+        game.current.row = (BOARD_HEIGHT as i32) - 2;
+        game.lock_and_begin_clear();
+        assert!(game.score >= 200);
+        assert_eq!(game.combo, 2);
+    }
+
+    #[test]
+    fn scoring_tspin_detection() {
+        let mut game = make_game();
+
+        let t_row = (BOARD_HEIGHT as i32) - 1;
+        let t_col = 4;
+        game.current = Piece::new(KIND_T);
+        game.current.row = t_row;
+        game.current.col = t_col;
+        game.current.rotation = 0;
+        game.last_move = LastMove::Rotate;
+
+        // Back corners are out of bounds (below board), front-left occupied -> 3 corners
+        let fr = (t_row - 1) as usize;
+        game.board[fr][t_col as usize - 1] = 1;
+
+        for c in 0..BOARD_WIDTH {
+            if c != (t_col - 1) as usize && c != t_col as usize && c != (t_col + 1) as usize {
+                game.board[t_row as usize][c] = 1;
+            }
+        }
+
+        game.lock_and_begin_clear();
+        if let Some(action) = &game.last_action {
+            assert!(action.is_tspin);
+        }
+    }
+
+    #[test]
+    fn no_clear_resets_combo() {
+        let mut game = make_game();
+        game.combo = 5;
+        game.current = Piece::new(0);
+        game.current.row = 0;
+        game.lock_and_begin_clear();
+        assert_eq!(game.combo, -1);
     }
 }

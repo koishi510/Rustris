@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 
+use crate::game::piece::{BOARD_HEIGHT, BOARD_WIDTH};
 use crate::game::settings::VersusSettings;
+use crate::game::Game;
+
+pub const PROTOCOL_VERSION: u8 = 1;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GarbageAttack {
@@ -18,6 +22,34 @@ pub struct BoardSnapshot {
     pub pending_garbage: u32,
 }
 
+impl BoardSnapshot {
+    pub fn from_game(game: &Game, pending_garbage: u32) -> Self {
+        let mut board = Vec::with_capacity(BOARD_WIDTH * BOARD_HEIGHT);
+        for row in 0..BOARD_HEIGHT {
+            for col in 0..BOARD_WIDTH {
+                board.push(game.board[row][col]);
+            }
+        }
+
+        let current_cells = if game.is_animating() || game.in_are() {
+            vec![]
+        } else {
+            game.current.cells().to_vec()
+        };
+
+        let current_kind = game.current.kind;
+
+        Self {
+            board,
+            current_cells,
+            current_kind,
+            score: game.score,
+            lines: game.lines,
+            pending_garbage,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum MatchOutcome {
     Win,
@@ -26,6 +58,7 @@ pub enum MatchOutcome {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum NetMessage {
+    Hello { version: u8 },
     LobbySettings(VersusSettings),
     Ready,
     Countdown(u8),

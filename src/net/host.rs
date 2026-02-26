@@ -3,6 +3,7 @@ use std::net::{Ipv4Addr, TcpListener, UdpSocket};
 
 use super::transport::Connection;
 
+#[cfg(target_os = "linux")]
 fn default_gateway() -> Option<Ipv4Addr> {
     let content = std::fs::read_to_string("/proc/net/route").ok()?;
     for line in content.lines().skip(1) {
@@ -15,6 +16,11 @@ fn default_gateway() -> Option<Ipv4Addr> {
             }
         }
     }
+    None
+}
+
+#[cfg(not(target_os = "linux"))]
+fn default_gateway() -> Option<Ipv4Addr> {
     None
 }
 
