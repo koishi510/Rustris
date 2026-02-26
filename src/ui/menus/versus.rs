@@ -44,21 +44,23 @@ fn draw_input_screen(
     label: &str,
     input: &str,
     error: &str,
+    selected: usize,
 ) -> io::Result<()> {
     execute!(stdout, cursor::MoveTo(0, 0))?;
     render::draw_title(stdout)?;
 
     let inner_w = BOARD_WIDTH * 2;
 
-    let label_line = format!("{}:", label);
-    let input_line = format!("{}_", input);
+    let input_text = if selected == 0 {
+        format!("{}: {}█", label, input)
+    } else {
+        format!("{}: {}", label, input)
+    };
     let mut content: Vec<Option<String>> = vec![
         None,
         Some(format!("{:^width$}", title, width = inner_w)),
         None,
-        Some(format!("{:^width$}", label_line, width = inner_w)),
-        Some(format!("{:^width$}", input_line, width = inner_w)),
-        None,
+        Some(render::menu_item(&input_text, selected == 0, inner_w)),
     ];
 
     if !error.is_empty() {
@@ -72,11 +74,8 @@ fn draw_input_screen(
     }
 
     content.push(None);
-    content.push(Some(format!(
-        "{:^width$}",
-        "Enter / Esc",
-        width = inner_w
-    )));
+    content.push(Some(render::menu_item("Confirm", selected == 1, inner_w)));
+    content.push(Some(render::menu_item("Cancel", selected == 2, inner_w)));
     content.push(None);
 
     render::draw_full_board_overlay(stdout, &content)
@@ -146,29 +145,41 @@ fn run_text_input(
 ) -> io::Result<Option<String>> {
     let mut input = default.to_string();
     let mut error = String::new();
+    let mut sel: usize = 0; // 0=input, 1=confirm, 2=cancel
+    let count: usize = 3;
 
     loop {
-        draw_input_screen(stdout, title, label, &input, &error)?;
+        draw_input_screen(stdout, title, label, &input, &error, sel)?;
 
         if let Event::Key(KeyEvent { code, .. }) = event::read()? {
             match code {
-                KeyCode::Char(c) if char_filter(c) => {
+                KeyCode::Up | KeyCode::Down => {
+                    sel = menu_nav(sel, count, code);
+                    play_menu_sfx(music, Sfx::MenuMove);
+                }
+                KeyCode::Char(c) if sel == 0 && char_filter(c) => {
                     if input.len() < max_len {
                         input.push(c);
                         error.clear();
                     }
                 }
-                KeyCode::Backspace => {
+                KeyCode::Backspace if sel == 0 => {
                     input.pop();
                     error.clear();
                 }
-                KeyCode::Enter => match validate(&input) {
-                    Ok(()) => {
-                        play_menu_sfx(music, Sfx::MenuSelect);
-                        return Ok(Some(input));
-                    }
-                    Err(msg) => {
-                        error = msg;
+                KeyCode::Enter => match sel {
+                    0 | 1 => match validate(&input) {
+                        Ok(()) => {
+                            play_menu_sfx(music, Sfx::MenuSelect);
+                            return Ok(Some(input));
+                        }
+                        Err(msg) => {
+                            error = msg;
+                        }
+                    },
+                    _ => {
+                        play_menu_sfx(music, Sfx::MenuBack);
+                        return Ok(None);
                     }
                 },
                 KeyCode::Esc => {

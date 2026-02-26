@@ -52,13 +52,19 @@ pub fn run_host_lobby(
 ) -> io::Result<Option<(Connection, VersusSettings)>> {
     let listener = crate::net::host::listen_nonblocking(port)?;
 
-    let port_str = port.to_string();
-    render::versus::draw_versus_lobby(stdout, true, &["Listening...", &format!("Port: {}", port_str)])?;
+    let addr_line = match crate::net::host::local_ip() {
+        Some(ip) => format!("{}:{}", ip, port),
+        None => format!("Port: {}", port),
+    };
 
     loop {
+        render::versus::draw_lobby_screen(
+            stdout, "HOST GAME", &["Listening...", &addr_line], "", &["Cancel"], 0,
+        )?;
+
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(KeyEvent { code, .. }) = event::read()? {
-                if code == KeyCode::Esc {
+                if code == KeyCode::Enter || code == KeyCode::Esc {
                     play_menu_sfx(music, Sfx::MenuBack);
                     return Ok(None);
                 }
@@ -70,10 +76,8 @@ pub fn run_host_lobby(
                 let vs = VersusSettings::from_settings(settings);
                 conn.send(&NetMessage::LobbySettings(vs))?;
 
-                render::versus::draw_versus_lobby(
-                    stdout,
-                    true,
-                    &["Connected!", "Waiting..."],
+                render::versus::draw_lobby_screen(
+                    stdout, "HOST GAME", &["Connected!", "Starting..."], "", &[], 0,
                 )?;
 
                 let msg = conn.recv_blocking()?;
@@ -100,24 +104,49 @@ pub fn run_client_lobby(
     music: &mut Option<audio::MusicPlayer>,
     addr: &str,
 ) -> io::Result<Option<(Connection, VersusSettings)>> {
-    render::versus::draw_versus_lobby(stdout, false, &["Connecting...", addr])?;
+    render::versus::draw_lobby_screen(
+        stdout, "JOIN GAME", &["Connecting...", addr], "", &[], 0,
+    )?;
 
     let mut conn = match crate::net::client::connect(addr) {
         Ok(c) => c,
         Err(_) => {
-            render::versus::draw_versus_lobby(stdout, false, &["Connect failed!", "Check address"])?;
+            let mut sel: usize = 0;
+            let count: usize = 2;
             loop {
+                render::versus::draw_lobby_screen(
+                    stdout, "JOIN GAME", &[addr], "Connection failed", &["Retry", "Cancel"], sel,
+                )?;
                 if let Event::Key(KeyEvent { code, .. }) = event::read()? {
-                    if code == KeyCode::Enter || code == KeyCode::Esc {
-                        play_menu_sfx(music, Sfx::MenuBack);
-                        return Ok(None);
+                    match code {
+                        KeyCode::Up | KeyCode::Down => {
+                            sel = menu_nav(sel, count, code);
+                            play_menu_sfx(music, Sfx::MenuMove);
+                        }
+                        KeyCode::Enter => match sel {
+                            0 => {
+                                play_menu_sfx(music, Sfx::MenuSelect);
+                                return run_client_lobby(stdout, music, addr);
+                            }
+                            _ => {
+                                play_menu_sfx(music, Sfx::MenuBack);
+                                return Ok(None);
+                            }
+                        },
+                        KeyCode::Esc => {
+                            play_menu_sfx(music, Sfx::MenuBack);
+                            return Ok(None);
+                        }
+                        _ => {}
                     }
                 }
             }
         }
     };
 
-    render::versus::draw_versus_lobby(stdout, false, &["Connected!", "Waiting..."])?;
+    render::versus::draw_lobby_screen(
+        stdout, "JOIN GAME", &["Connected!", "Starting..."], "", &[], 0,
+    )?;
 
     let msg = conn.recv_blocking()?;
     let vs = match msg {
@@ -545,7 +574,8 @@ fn run_result_screen(
 
                                 if event::poll(Duration::from_millis(50))? {
                                     if let Event::Key(KeyEvent { code, .. }) = event::read()? {
-                                        if code == KeyCode::Esc {
+                                        if code == KeyCode::Esc || code == KeyCode::Enter {
+                                            play_menu_sfx(music, Sfx::MenuBack);
                                             let _ = conn.send(&NetMessage::Disconnect);
                                             return Ok(ResultAction::Menu);
                                         }

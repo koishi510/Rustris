@@ -117,16 +117,18 @@ pub fn draw_versus(
     Ok(())
 }
 
-pub fn draw_versus_lobby(
+pub fn draw_lobby_screen(
     stdout: &mut io::Stdout,
-    is_host: bool,
-    status_lines: &[&str],
+    title: &str,
+    lines: &[&str],
+    error: &str,
+    items: &[&str],
+    selected: usize,
 ) -> io::Result<()> {
     execute!(stdout, cursor::MoveTo(0, 0))?;
     draw_title(stdout)?;
 
     let inner_w = BOARD_WIDTH * 2;
-    let title = if is_host { "HOST" } else { "CLIENT" };
 
     let mut content: Vec<Option<String>> = vec![
         None,
@@ -134,17 +136,26 @@ pub fn draw_versus_lobby(
         None,
     ];
 
-    for line in status_lines {
+    for line in lines {
         let truncated = &line[..line.len().min(inner_w)];
         content.push(Some(format!("{:^width$}", truncated, width = inner_w)));
     }
 
+    if !error.is_empty() {
+        content.push(None);
+        let truncated = &error[..error.len().min(inner_w)];
+        content.push(Some(format!(
+            "{}",
+            format!("{:^width$}", truncated, width = inner_w)
+                .as_str()
+                .with(Color::Red)
+        )));
+    }
+
     content.push(None);
-    content.push(Some(format!(
-        "{:^width$}",
-        "ESC to cancel",
-        width = inner_w
-    )));
+    for (i, item) in items.iter().enumerate() {
+        content.push(Some(menu_item(item, i == selected, inner_w)));
+    }
     content.push(None);
 
     draw_full_board_overlay(stdout, &content)
@@ -220,11 +231,7 @@ pub fn draw_versus_waiting_rematch(stdout: &mut io::Stdout) -> io::Result<()> {
         None,
         Some(format!("{:^width$}", "Waiting...", width = inner_w)),
         None,
-        Some(format!(
-            "{:^width$}",
-            "ESC to cancel",
-            width = inner_w
-        )),
+        Some(menu_item("Cancel", true, inner_w)),
         None,
     ];
 
