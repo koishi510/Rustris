@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event, KeyCode, KeyEvent};
+use crossterm::event::KeyCode;
 use std::io;
 
 use crate::audio::{self, Sfx};
@@ -6,7 +6,7 @@ use crate::game::GameMode;
 use crate::game::piece::MAX_NEXT_COUNT;
 use crate::render;
 use crate::game::settings::Settings;
-use crate::ui::{menu_nav, play_menu_sfx};
+use crate::ui::{menu_nav, play_menu_sfx, read_key};
 
 fn adjust_setting(settings: &mut Settings, sel: usize, direction: i32, mode: GameMode) {
     let mc: usize = match mode {
@@ -111,7 +111,7 @@ pub(crate) fn run_settings(
                 None => (false, false),
             };
             render::draw_settings(stdout, settings, mode, bgm_on, sfx_on, sel, true)?;
-            if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+            if let Some(code) = read_key()? {
                 match code {
                     KeyCode::Up | KeyCode::Down => {
                         sel = menu_nav(sel, count, code);
@@ -181,7 +181,7 @@ pub(crate) fn run_settings(
             None => (false, false),
         };
         render::draw_settings(stdout, settings, mode, bgm_on, sfx_on, sel, false)?;
-        if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+        if let Some(code) = read_key()? {
             match code {
                 KeyCode::Up | KeyCode::Down => {
                     sel = menu_nav(sel, count, code);

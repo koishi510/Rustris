@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event, KeyCode, KeyEvent};
+use crossterm::event::KeyCode;
 use crossterm::style::{Color, Stylize};
 use crossterm::{cursor, execute};
 use std::io;
@@ -7,7 +7,7 @@ use crate::audio::{self, Sfx};
 use crate::game::piece::BOARD_WIDTH;
 use crate::render;
 use crate::game::settings::Settings;
-use crate::ui::{menu_nav, play_menu_sfx};
+use crate::ui::{menu_nav, play_menu_sfx, read_key};
 
 pub enum VersusAction {
     Host(u16),
@@ -94,7 +94,7 @@ pub fn run_versus_menu(
     loop {
         draw_versus_menu(stdout, sel)?;
 
-        if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+        if let Some(code) = read_key()? {
             match code {
                 KeyCode::Up | KeyCode::Down => {
                     sel = menu_nav(sel, count, code);
@@ -151,7 +151,7 @@ fn run_text_input(
     loop {
         draw_input_screen(stdout, title, label, &input, &error, sel, indent)?;
 
-        if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+        if let Some(code) = read_key()? {
             match code {
                 KeyCode::Up | KeyCode::Down => {
                     sel = menu_nav(sel, count, code);

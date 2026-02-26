@@ -6,12 +6,28 @@ pub mod versus;
 pub use game_loop::run_game;
 pub use menus::{select_mode, run_versus_menu, VersusAction};
 
+use std::io;
 use std::time::{Duration, Instant};
 
-use crossterm::event::KeyCode;
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 
 use crate::audio::{self, Sfx};
 use crate::game::Game;
+
+pub(crate) fn force_quit() -> io::Error {
+    io::Error::new(io::ErrorKind::Interrupted, "force quit")
+}
+
+pub(crate) fn read_key() -> io::Result<Option<KeyCode>> {
+    if let Event::Key(KeyEvent { code, modifiers, .. }) = event::read()? {
+        if code == KeyCode::Char('c') && modifiers.contains(KeyModifiers::CONTROL) {
+            return Err(force_quit());
+        }
+        Ok(Some(code))
+    } else {
+        Ok(None)
+    }
+}
 
 pub(crate) const DAS_DELAY: Duration = Duration::from_millis(167);
 pub(crate) const ARR_INTERVAL: Duration = Duration::from_millis(33);

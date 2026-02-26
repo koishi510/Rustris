@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event, KeyCode, KeyEvent};
+use crossterm::event::KeyCode;
 use std::io;
 
 use crate::audio::{self, Sfx};
@@ -6,7 +6,7 @@ use crate::game::GameMode;
 use crate::game::records::Records;
 use crate::render;
 use crate::game::settings::Settings;
-use crate::ui::{menu_nav, play_menu_sfx};
+use crate::ui::{menu_nav, play_menu_sfx, read_key};
 
 use super::run_settings;
 
@@ -23,7 +23,7 @@ pub fn select_mode(
     loop {
         render::draw_mode_select(stdout, mode, sel)?;
 
-        if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+        if let Some(code) = read_key()? {
             match code {
                 KeyCode::Up | KeyCode::Down => {
                     sel = menu_nav(sel, count, code);
@@ -67,7 +67,7 @@ pub fn select_mode(
                         play_menu_sfx(music, Sfx::MenuSelect);
                         render::draw_help(stdout, 0)?;
                         loop {
-                            if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+                            if let Some(code) = read_key()? {
                                 if code == KeyCode::Enter || code == KeyCode::Esc {
                                     play_menu_sfx(music, Sfx::MenuBack);
                                     break;
@@ -95,7 +95,7 @@ fn run_records(
 
     loop {
         render::draw_records(stdout, records, mode, sel)?;
-        if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+        if let Some(code) = read_key()? {
             match code {
                 KeyCode::Up => {
                     sel = sel.checked_sub(1).unwrap_or(1);

@@ -52,7 +52,7 @@ fn main() -> io::Result<()> {
         terminal::Clear(terminal::ClearType::All)
     )?;
 
-    let result = (|| {
+    let result: io::Result<()> = (|| {
         // If CLI args specify versus mode, go straight to it
         if let Some(arg) = versus_arg {
             execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
@@ -119,5 +119,8 @@ fn main() -> io::Result<()> {
     execute!(stdout, cursor::Show, terminal::LeaveAlternateScreen)?;
     terminal::disable_raw_mode()?;
 
-    result
+    match &result {
+        Err(e) if e.kind() == io::ErrorKind::Interrupted => Ok(()),
+        _ => result,
+    }
 }

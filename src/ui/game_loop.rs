@@ -1,5 +1,5 @@
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent},
+    event::{self, KeyCode},
     execute,
     terminal,
 };
@@ -14,7 +14,7 @@ use crate::game::settings::Settings;
 
 use super::input::{self, InputState};
 use super::menus::run_settings;
-use super::{menu_nav, play_menu_sfx};
+use super::{menu_nav, play_menu_sfx, read_key};
 
 fn iso8601_now() -> String {
     let dur = SystemTime::now()
@@ -120,7 +120,7 @@ pub fn run_game(
             let count: usize = 3;
             loop {
                 render::draw_game_over(stdout, &game, sel, rank)?;
-                if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+                if let Some(code) = read_key()? {
                     match code {
                         KeyCode::Up | KeyCode::Down => {
                             sel = menu_nav(sel, count, code);
@@ -163,7 +163,7 @@ pub fn run_game(
         if game.is_animating() {
             if game.update_animation() {
                 if event::poll(Duration::from_millis(16))? {
-                    if let Event::Key(_) = event::read()? {}
+                    let _ = read_key()?;
                 }
                 continue;
             } else {
@@ -184,7 +184,7 @@ pub fn run_game(
         }
 
         if event::poll(timeout)? {
-            if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+            if let Some(code) = read_key()? {
                 match code {
                     KeyCode::Esc | KeyCode::Char('p') | KeyCode::Char('P') => {
                         if let Some(m) = music.as_mut() {
@@ -196,7 +196,7 @@ pub fn run_game(
                         let mut retry = false;
                         loop {
                             render::draw_pause(stdout, sel)?;
-                            if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+                            if let Some(code) = read_key()? {
                                 match code {
                                     KeyCode::Up | KeyCode::Down => {
                                         sel = menu_nav(sel, count, code);
@@ -217,7 +217,7 @@ pub fn run_game(
                                             play_menu_sfx(music, Sfx::MenuSelect);
                                             render::draw_help(stdout, 0)?;
                                             loop {
-                                                if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+                                                if let Some(code) = read_key()? {
                                                     if code == KeyCode::Enter || code == KeyCode::Esc {
                                                         play_menu_sfx(music, Sfx::MenuBack);
                                                         break;

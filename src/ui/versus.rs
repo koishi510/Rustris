@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event, KeyCode, KeyEvent};
+use crossterm::event::{self, KeyCode};
 use crossterm::{execute, terminal};
 use std::io;
 use std::time::{Duration, Instant};
@@ -13,7 +13,7 @@ use crate::render;
 use crate::game::settings::{Settings, VersusSettings};
 
 use super::input::{self, InputState};
-use super::{menu_nav, play_menu_sfx};
+use super::{menu_nav, play_menu_sfx, read_key};
 
 const BOARD_SYNC_INTERVAL: Duration = Duration::from_millis(66);
 
@@ -63,7 +63,7 @@ pub fn run_host_lobby(
         )?;
 
         if event::poll(Duration::from_millis(100))? {
-            if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+            if let Some(code) = read_key()? {
                 if code == KeyCode::Enter || code == KeyCode::Esc {
                     play_menu_sfx(music, Sfx::MenuBack);
                     return Ok(None);
@@ -117,7 +117,7 @@ pub fn run_client_lobby(
                 render::versus::draw_lobby_screen(
                     stdout, "JOIN GAME", &[addr], "Connection failed", &["Retry", "Cancel"], sel,
                 )?;
-                if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+                if let Some(code) = read_key()? {
                     match code {
                         KeyCode::Up | KeyCode::Down => {
                             sel = menu_nav(sel, count, code);
@@ -313,7 +313,7 @@ pub fn run_versus(
             if game.is_animating() {
                 if game.update_animation() {
                     if event::poll(Duration::from_millis(16))? {
-                        if let Event::Key(_) = event::read()? {}
+                        let _ = read_key()?;
                     }
                     continue;
                 } else {
@@ -327,7 +327,7 @@ pub fn run_versus(
             timeout = timeout.min(Duration::from_millis(16));
 
             if event::poll(timeout)? {
-                if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+                if let Some(code) = read_key()? {
                     match code {
                         KeyCode::Esc => {
                             if let Some(m) = music.as_mut() {
@@ -339,7 +339,7 @@ pub fn run_versus(
                             loop {
                                 render::versus::draw_versus_forfeit(stdout, sel)?;
 
-                                if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+                                if let Some(code) = read_key()? {
                                     match code {
                                         KeyCode::Up | KeyCode::Down => {
                                             sel = menu_nav(sel, count, code);
@@ -535,7 +535,7 @@ fn run_result_screen(
         }
 
         if event::poll(Duration::from_millis(50))? {
-            if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+            if let Some(code) = read_key()? {
                 match code {
                     KeyCode::Up | KeyCode::Down => {
                         sel = menu_nav(sel, count, code);
@@ -573,7 +573,7 @@ fn run_result_screen(
                                 }
 
                                 if event::poll(Duration::from_millis(50))? {
-                                    if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+                                    if let Some(code) = read_key()? {
                                         if code == KeyCode::Esc || code == KeyCode::Enter {
                                             play_menu_sfx(music, Sfx::MenuBack);
                                             let _ = conn.send(&NetMessage::Disconnect);
