@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::settings::VersusSettings;
+use crate::game::settings::VersusSettings;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GarbageAttack {

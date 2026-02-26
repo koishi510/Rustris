@@ -3,9 +3,9 @@ use std::io::{self, Write};
 use std::time::Duration;
 
 use crate::game::{Game, GameMode};
-use crate::piece::*;
-use crate::records::Records;
-use crate::settings::Settings;
+use crate::game::piece::*;
+use crate::game::records::Records;
+use crate::game::settings::Settings;
 
 use super::{
     draw_full_board_overlay, draw_title, menu_item, settings_toggle, settings_toggle_dim,

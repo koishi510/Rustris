@@ -10,7 +10,7 @@ use std::io::{self, Write};
 use std::time::Duration;
 
 use crate::game::{Game, GameMode};
-use crate::piece::*;
+use crate::game::piece::*;
 
 pub(crate) const LEFT_W: usize = 12;
 
@@ -68,6 +68,90 @@ pub(crate) fn color_for(id: u8) -> Color {
     } else {
         PIECE_COLORS[(id - 1) as usize]
     }
+}
+
+pub(crate) struct BoardRenderState {
+    pub ghost_cells: [(i32, i32); 4],
+    pub current_cells: [(i32, i32); 4],
+    pub current_color: Color,
+    pub anim_rows: Vec<usize>,
+    pub anim_phase: u8,
+}
+
+impl BoardRenderState {
+    pub fn from_game(game: &Game) -> Self {
+        let animating = game.is_animating();
+        let anim_rows: Vec<usize> = game
+            .line_clear_anim
+            .as_ref()
+            .map(|a| a.rows.clone())
+            .unwrap_or_default();
+        let anim_phase = game
+            .line_clear_anim
+            .as_ref()
+            .map(|a| a.phase)
+            .unwrap_or(0);
+
+        let ghost_cells: [(i32, i32); 4];
+        let current_cells: [(i32, i32); 4];
+        let current_color: Color;
+        if animating || game.in_are() {
+            ghost_cells = [(-1, -1); 4];
+            current_cells = [(-1, -1); 4];
+            current_color = Color::White;
+        } else {
+            if game.ghost_enabled {
+                let ghost_row = game.ghost_row();
+                ghost_cells = {
+                    let mut g = game.current.clone();
+                    g.row = ghost_row;
+                    g.cells()
+                };
+            } else {
+                ghost_cells = [(-1, -1); 4];
+            }
+            current_cells = game.current.cells();
+            current_color = PIECE_COLORS[game.current.kind];
+        }
+
+        Self {
+            ghost_cells,
+            current_cells,
+            current_color,
+            anim_rows,
+            anim_phase,
+        }
+    }
+}
+
+pub(crate) fn draw_board_cell(
+    stdout: &mut io::Stdout,
+    board: &[[u8; BOARD_WIDTH]; BOARD_HEIGHT],
+    row: usize,
+    col: usize,
+    state: &BoardRenderState,
+) -> io::Result<()> {
+    if state.anim_rows.contains(&row) {
+        match state.anim_phase {
+            0 => write!(stdout, "{}", "██".with(Color::White))?,
+            1 => write!(stdout, "{}", "▓▓".with(Color::DarkGrey))?,
+            _ => write!(stdout, "  ")?,
+        }
+    } else if state.current_cells.contains(&(row as i32, col as i32)) {
+        write!(stdout, "{}", "██".with(state.current_color))?;
+    } else if state.ghost_cells.contains(&(row as i32, col as i32))
+        && board[row][col] == EMPTY
+    {
+        write!(stdout, "{}", "░░".with(state.current_color))?;
+    } else {
+        let id = board[row][col];
+        if id == EMPTY {
+            write!(stdout, "  ")?;
+        } else {
+            write!(stdout, "{}", "██".with(color_for(id)))?;
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn draw_piece_preview(

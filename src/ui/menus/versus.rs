@@ -4,9 +4,10 @@ use crossterm::{cursor, execute};
 use std::io;
 
 use crate::audio::{self, Sfx};
-use crate::piece::BOARD_WIDTH;
+use crate::game::piece::BOARD_WIDTH;
 use crate::render;
-use crate::settings::Settings;
+use crate::game::settings::Settings;
+use crate::ui::{menu_nav, play_menu_sfx};
 
 pub enum VersusAction {
     Host(u16),
@@ -94,24 +95,14 @@ pub fn run_versus_menu(
 
         if let Event::Key(KeyEvent { code, .. }) = event::read()? {
             match code {
-                KeyCode::Up => {
-                    sel = sel.checked_sub(1).unwrap_or(count - 1);
-                    if let Some(m) = music.as_ref() {
-                        m.play_sfx(Sfx::MenuMove);
-                    }
-                }
-                KeyCode::Down => {
-                    sel = (sel + 1) % count;
-                    if let Some(m) = music.as_ref() {
-                        m.play_sfx(Sfx::MenuMove);
-                    }
+                KeyCode::Up | KeyCode::Down => {
+                    sel = menu_nav(sel, count, code);
+                    play_menu_sfx(music, Sfx::MenuMove);
                 }
                 KeyCode::Enter => match sel {
                     0 => {
                         // Host
-                        if let Some(m) = music.as_ref() {
-                            m.play_sfx(Sfx::MenuSelect);
-                        }
+                        play_menu_sfx(music, Sfx::MenuSelect);
                         match run_port_input(stdout, music)? {
                             Some(port) => return Ok(VersusAction::Host(port)),
                             None => continue,
@@ -119,9 +110,7 @@ pub fn run_versus_menu(
                     }
                     1 => {
                         // Join
-                        if let Some(m) = music.as_ref() {
-                            m.play_sfx(Sfx::MenuSelect);
-                        }
+                        play_menu_sfx(music, Sfx::MenuSelect);
                         match run_addr_input(stdout, music)? {
                             Some(addr) => return Ok(VersusAction::Join(addr)),
                             None => continue,
@@ -129,18 +118,62 @@ pub fn run_versus_menu(
                     }
                     2 => {
                         // Back
-                        if let Some(m) = music.as_ref() {
-                            m.play_sfx(Sfx::MenuBack);
-                        }
+                        play_menu_sfx(music, Sfx::MenuBack);
                         return Ok(VersusAction::Back);
                     }
                     _ => {}
                 },
                 KeyCode::Esc => {
-                    if let Some(m) = music.as_ref() {
-                        m.play_sfx(Sfx::MenuBack);
-                    }
+                    play_menu_sfx(music, Sfx::MenuBack);
                     return Ok(VersusAction::Back);
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_text_input(
+    stdout: &mut io::Stdout,
+    music: &mut Option<audio::MusicPlayer>,
+    title: &str,
+    label: &str,
+    default: &str,
+    max_len: usize,
+    char_filter: fn(char) -> bool,
+    validate: &dyn Fn(&str) -> Result<(), String>,
+) -> io::Result<Option<String>> {
+    let mut input = default.to_string();
+    let mut error = String::new();
+
+    loop {
+        draw_input_screen(stdout, title, label, &input, &error)?;
+
+        if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+            match code {
+                KeyCode::Char(c) if char_filter(c) => {
+                    if input.len() < max_len {
+                        input.push(c);
+                        error.clear();
+                    }
+                }
+                KeyCode::Backspace => {
+                    input.pop();
+                    error.clear();
+                }
+                KeyCode::Enter => match validate(&input) {
+                    Ok(()) => {
+                        play_menu_sfx(music, Sfx::MenuSelect);
+                        return Ok(Some(input));
+                    }
+                    Err(msg) => {
+                        error = msg;
+                    }
+                },
+                KeyCode::Esc => {
+                    play_menu_sfx(music, Sfx::MenuBack);
+                    return Ok(None);
                 }
                 _ => {}
             }
@@ -152,94 +185,42 @@ fn run_port_input(
     stdout: &mut io::Stdout,
     music: &mut Option<audio::MusicPlayer>,
 ) -> io::Result<Option<u16>> {
-    let mut input = "3000".to_string();
-    let mut error = String::new();
-
-    loop {
-        draw_input_screen(stdout, "HOST GAME", "Port", &input, &error)?;
-
-        if let Event::Key(KeyEvent { code, .. }) = event::read()? {
-            match code {
-                KeyCode::Char(c) if c.is_ascii_digit() => {
-                    if input.len() < 5 {
-                        input.push(c);
-                        error.clear();
-                    }
-                }
-                KeyCode::Backspace => {
-                    input.pop();
-                    error.clear();
-                }
-                KeyCode::Enter => {
-                    match input.parse::<u16>() {
-                        Ok(port) if port > 0 => {
-                            if let Some(m) = music.as_ref() {
-                                m.play_sfx(Sfx::MenuSelect);
-                            }
-                            return Ok(Some(port));
-                        }
-                        _ => {
-                            error = "Invalid port".to_string();
-                        }
-                    }
-                }
-                KeyCode::Esc => {
-                    if let Some(m) = music.as_ref() {
-                        m.play_sfx(Sfx::MenuBack);
-                    }
-                    return Ok(None);
-                }
-                _ => {}
-            }
-        }
-    }
+    let result = run_text_input(
+        stdout,
+        music,
+        "HOST GAME",
+        "Port",
+        "3000",
+        5,
+        |c| c.is_ascii_digit(),
+        &|s| match s.parse::<u16>() {
+            Ok(port) if port > 0 => Ok(()),
+            _ => Err("Invalid port".to_string()),
+        },
+    )?;
+    Ok(result.and_then(|s| s.parse::<u16>().ok()))
 }
 
 fn run_addr_input(
     stdout: &mut io::Stdout,
     music: &mut Option<audio::MusicPlayer>,
 ) -> io::Result<Option<String>> {
-    let mut input = "127.0.0.1:3000".to_string();
-    let mut error = String::new();
-
-    loop {
-        draw_input_screen(stdout, "JOIN GAME", "Address", &input, &error)?;
-
-        if let Event::Key(KeyEvent { code, .. }) = event::read()? {
-            match code {
-                KeyCode::Char(c) if c.is_ascii_graphic() => {
-                    if input.len() < 21 {
-                        input.push(c);
-                        error.clear();
-                    }
-                }
-                KeyCode::Backspace => {
-                    input.pop();
-                    error.clear();
-                }
-                KeyCode::Enter => {
-                    if input.is_empty() {
-                        error = "Enter an address".to_string();
-                    } else {
-                        // Validate basic format
-                        if input.contains(':') {
-                            if let Some(m) = music.as_ref() {
-                                m.play_sfx(Sfx::MenuSelect);
-                            }
-                            return Ok(Some(input));
-                        } else {
-                            error = "Use host:port format".to_string();
-                        }
-                    }
-                }
-                KeyCode::Esc => {
-                    if let Some(m) = music.as_ref() {
-                        m.play_sfx(Sfx::MenuBack);
-                    }
-                    return Ok(None);
-                }
-                _ => {}
+    run_text_input(
+        stdout,
+        music,
+        "JOIN GAME",
+        "Address",
+        "127.0.0.1:3000",
+        21,
+        |c| c.is_ascii_graphic(),
+        &|s| {
+            if s.is_empty() {
+                Err("Enter an address".to_string())
+            } else if !s.contains(':') {
+                Err("Use host:port format".to_string())
+            } else {
+                Ok(())
             }
-        }
-    }
+        },
+    )
 }

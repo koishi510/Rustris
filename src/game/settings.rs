@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::piece::MAX_NEXT_COUNT;
+use crate::game::piece::MAX_NEXT_COUNT;
 
 #[derive(Clone, Copy)]
 pub struct Settings {

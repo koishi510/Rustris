@@ -1,11 +1,14 @@
 pub mod garbage;
+pub mod piece;
+pub mod records;
+pub mod settings;
 pub mod types;
 pub use types::*;
 
 use std::time::{Duration, Instant};
 
-use crate::piece::*;
-use crate::settings::Settings;
+use crate::game::piece::*;
+use crate::game::settings::Settings;
 
 pub struct Game {
     pub board: [[u8; BOARD_WIDTH]; BOARD_HEIGHT],

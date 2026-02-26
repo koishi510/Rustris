@@ -1,17 +1,14 @@
 mod audio;
 mod game;
 mod net;
-mod piece;
-mod records;
 mod render;
-mod settings;
 mod ui;
 
 use crossterm::{cursor, execute, terminal};
 use std::io;
 
-use records::Records;
-use settings::Settings;
+use game::records::Records;
+use game::settings::Settings;
 
 fn parse_args() -> Option<VersusArg> {
     let args: Vec<String> = std::env::args().collect();
@@ -88,9 +85,9 @@ fn main() -> io::Result<()> {
                 None => return Ok(()),
             };
             if mode == game::GameMode::Versus {
-                let action = ui::menus_versus::run_versus_menu(&mut stdout, &mut music, &mut settings)?;
+                let action = ui::run_versus_menu(&mut stdout, &mut music, &mut settings)?;
                 match action {
-                    ui::menus_versus::VersusAction::Host(port) => {
+                    ui::VersusAction::Host(port) => {
                         let lobby = ui::versus::run_host_lobby(&mut stdout, &mut music, &settings, port)?;
                         if let Some((mut conn, vs_settings)) = lobby {
                             let quit = ui::versus::run_versus(&mut stdout, &mut music, &mut conn, &vs_settings, true)?;
@@ -99,7 +96,7 @@ fn main() -> io::Result<()> {
                             }
                         }
                     }
-                    ui::menus_versus::VersusAction::Join(addr) => {
+                    ui::VersusAction::Join(addr) => {
                         let lobby = ui::versus::run_client_lobby(&mut stdout, &mut music, &addr)?;
                         if let Some((mut conn, vs_settings)) = lobby {
                             let quit = ui::versus::run_versus(&mut stdout, &mut music, &mut conn, &vs_settings, false)?;
@@ -108,7 +105,7 @@ fn main() -> io::Result<()> {
                             }
                         }
                     }
-                    ui::menus_versus::VersusAction::Back => continue,
+                    ui::VersusAction::Back => continue,
                 }
                 continue;
             }
