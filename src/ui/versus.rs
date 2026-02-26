@@ -389,9 +389,11 @@ pub fn run_versus(
                             let hard_dropped = input::handle_game_key(other, &mut game, &mut inp, music);
                             if hard_dropped {
                                 process_post_lock(
+                                    stdout,
                                     &mut game,
                                     &mut garbage_queue,
                                     conn,
+                                    &opponent_snapshot,
                                     music,
                                 )?;
                             }
@@ -407,7 +409,7 @@ pub fn run_versus(
 
             let locked = input::update_game_timers(&mut game, &mut inp, music);
             if locked {
-                process_post_lock(&mut game, &mut garbage_queue, conn, music)?;
+                process_post_lock(stdout, &mut game, &mut garbage_queue, conn, &opponent_snapshot, music)?;
             }
         }
 
@@ -448,9 +450,11 @@ pub fn run_versus(
 }
 
 fn process_post_lock(
+    stdout: &mut io::Stdout,
     game: &mut Game,
     garbage_queue: &mut GarbageQueue,
     conn: &mut Connection,
+    opponent_snapshot: &Option<BoardSnapshot>,
     music: &Option<audio::MusicPlayer>,
 ) -> io::Result<()> {
     if let Some(action) = &game.last_action {
@@ -468,29 +472,38 @@ fn process_post_lock(
                 }
             }
         } else {
-            apply_pending_garbage(game, garbage_queue, music);
+            apply_pending_garbage(stdout, game, garbage_queue, opponent_snapshot, music)?;
         }
     } else {
-        apply_pending_garbage(game, garbage_queue, music);
+        apply_pending_garbage(stdout, game, garbage_queue, opponent_snapshot, music)?;
     }
     Ok(())
 }
 
+const GARBAGE_RISE_INTERVAL: Duration = Duration::from_millis(40);
+
 fn apply_pending_garbage(
+    stdout: &mut io::Stdout,
     game: &mut Game,
     garbage_queue: &mut GarbageQueue,
+    opponent_snapshot: &Option<BoardSnapshot>,
     music: &Option<audio::MusicPlayer>,
-) {
+) -> io::Result<()> {
     let events = garbage_queue.drain_all();
-    let had_garbage = !events.is_empty();
-    for event in events {
-        game.receive_garbage(event.lines, event.hole_column);
+    if events.is_empty() {
+        return Ok(());
     }
-    if had_garbage {
-        if let Some(m) = music.as_ref() {
-            m.play_sfx(Sfx::GarbageReceived);
+    for event in events {
+        for _ in 0..event.lines {
+            if let Some(m) = music.as_ref() {
+                m.play_sfx(Sfx::GarbageReceived);
+            }
+            game.receive_garbage(1, event.hole_column);
+            render::versus::draw_versus(stdout, game, opponent_snapshot, garbage_queue.total_pending())?;
+            std::thread::sleep(GARBAGE_RISE_INTERVAL);
         }
     }
+    Ok(())
 }
 
 enum ResultAction {
