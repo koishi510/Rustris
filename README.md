@@ -40,19 +40,7 @@ Play 1v1 over a local network. One player hosts, the other joins.
 
 ### Quick Start
 
-**Terminal 1 (Host):**
-```sh
-cargo run --release -- --host 3000
-```
-
-**Terminal 2 (Client):**
-```sh
-cargo run --release -- --join 127.0.0.1:3000
-```
-
-Replace `127.0.0.1` with the host's LAN IP for cross-machine play.
-
-You can also start Versus from the in-game menu by cycling to the **Versus** mode and selecting Host or Join.
+Start the game and select **Versus** mode from the menu. One player selects **Host** (enter a port), the other selects **Join** (enter `<host-ip>:<port>`). The host's LAN IP is displayed on the lobby screen.
 
 ### Garbage System
 
@@ -108,7 +96,7 @@ Pending garbage is absorbed when you clear lines (cancel before send). Uncleared
 - **Guideline gravity** with level cap setting
 - **BGM & SFX** with polyphonic playback
 - **Leaderboard** - top 10 per mode, recorded only under default settings
-- **LAN Versus** - P2P TCP multiplayer with garbage system, dual-board rendering, rematch support
+- **LAN Versus** - P2P TCP multiplayer with protocol handshake, garbage system, dual-board rendering, rematch support
 
 ## Settings
 
@@ -134,12 +122,15 @@ Pending garbage is absorbed when you clear lines (cancel before send). Uncleared
 
 ```
 src/
-  main.rs              Entry point, CLI args (--host/--join), terminal init/cleanup
+  main.rs              Entry point, terminal init/cleanup
   audio/
     mod.rs             BGM and SFX playback (polyphonic synthesis)
     bgm_score.rs       BGM note/melody data
   game/
-    mod.rs             Game struct and all gameplay logic
+    mod.rs             Game struct, construction, board queries
+    movement.rs        Piece movement, rotation (SRS), gravity, drop
+    scoring.rs         T-Spin detection, line clear, scoring
+    animation.rs       Line clear animation, ARE, garbage rise animation
     types.rs           GameMode, LastMove, ClearAction, timing constants
     piece.rs           Piece/Bag structs, SRS data (rotation states, kick tables)
     settings.rs        Settings and VersusSettings structs
@@ -147,10 +138,10 @@ src/
     garbage.rs         Attack calculation, garbage queue, cancel logic
   net/
     mod.rs             Network module exports
-    protocol.rs        NetMessage enum, GarbageAttack, BoardSnapshot types
-    transport.rs       Connection: frame encoding/decoding, non-blocking TCP I/O
-    host.rs            TCP listener (non-blocking accept)
-    client.rs          TCP connect
+    protocol.rs        NetMessage enum, protocol version, BoardSnapshot, GarbageAttack
+    transport.rs       Connection: frame encoding/decoding, non-blocking TCP I/O, timeout/length guard
+    host.rs            LAN IP detection, TCP listener (non-blocking accept)
+    client.rs          TCP connect with timeout
   render/
     mod.rs             Shared render utilities, title, piece preview
     board.rs           Single-player board rendering
@@ -160,7 +151,7 @@ src/
     mod.rs             Shared UI helpers (DAS state, menu nav, SFX wrappers)
     input.rs           In-game key handling, DAS/ARR, gravity, lock delay
     game_loop.rs       Single-player game loop, pause, game over, records
-    versus.rs          Versus game loop, lobby, countdown, garbage, rematch
+    versus.rs          Versus game loop, lobby, handshake, countdown, garbage, rematch
     menus/
       mod.rs           Menu module exports
       mode_select.rs   Mode select screen, records viewer
