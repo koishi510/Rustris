@@ -46,19 +46,19 @@ Start the game and select **Versus** mode from the menu. One player selects **Ho
 
 Clearing lines sends garbage to your opponent:
 
-| Clear Type       | Attack |
-| ---------------- | ------ |
-| Single           | 0      |
-| Double           | 1      |
-| Triple           | 2      |
-| Tetris           | 4      |
-| T-Spin Single    | 2      |
-| T-Spin Double    | 4      |
-| T-Spin Triple    | 6      |
-| T-Spin Mini Single | 0    |
-| T-Spin Mini Double | 1    |
-| Back-to-Back     | +1     |
-| Perfect Clear    | 10     |
+| Clear Type         | Attack |
+| ------------------ | ------ |
+| Single             | 0      |
+| Double             | 1      |
+| Triple             | 2      |
+| Tetris             | 4      |
+| T-Spin Single      | 2      |
+| T-Spin Double      | 4      |
+| T-Spin Triple      | 6      |
+| T-Spin Mini Single | 0      |
+| T-Spin Mini Double | 1      |
+| Back-to-Back       | +1     |
+| Perfect Clear      | 10     |
 
 Combo bonus (added on top): 0-1 combo = +0, 2-3 = +1, 4-5 = +2, 6-7 = +3, 8-10 = +4, 11+ = +5.
 
@@ -81,6 +81,7 @@ Pending garbage is absorbed when you clear lines (cancel before send). Uncleared
 | Z            | Rotate counter-clockwise |
 | C            | Hold piece               |
 | Esc / P      | Pause (Forfeit in Versus)|
+| Ctrl+C       | Force quit               |
 
 ## Features
 
