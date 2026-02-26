@@ -390,31 +390,20 @@ pub fn run_versus(
             if we_died && !opponent_dead {
                 let _ = conn.send(&NetMessage::MatchResult(MatchOutcome::Lose));
                 false
-            } else if opponent_dead && !we_died {
-                let _ = conn.send(&NetMessage::MatchResult(MatchOutcome::Win));
-                true
             } else {
                 let _ = conn.send(&NetMessage::MatchResult(MatchOutcome::Win));
                 true
             }
         } else {
-            if we_died && !opponent_dead {
-                false
-            } else if opponent_dead && !we_died {
-                true
-            } else {
-                false
-            }
+            opponent_dead && !we_died
         };
 
         if won {
             if let Some(m) = music.as_ref() {
                 m.play_sfx(Sfx::VersusWin);
             }
-        } else {
-            if let Some(m) = music.as_ref() {
-                m.play_sfx(Sfx::VersusLose);
-            }
+        } else if let Some(m) = music.as_ref() {
+            m.play_sfx(Sfx::VersusLose);
         }
 
         let rematch = run_result_screen(stdout, music, conn, won)?;

@@ -59,13 +59,10 @@ impl Records {
 
         match mode {
             GameMode::Sprint => {
-                let time = match record.time {
-                    Some(t) => t,
-                    None => return None,
-                };
+                let time = record.time?;
                 let pos = list
                     .iter()
-                    .position(|r| r.time.map_or(true, |t| time < t))
+                    .position(|r| r.time.is_none_or(|t| time < t))
                     .unwrap_or(list.len());
                 if pos >= 10 {
                     return None;

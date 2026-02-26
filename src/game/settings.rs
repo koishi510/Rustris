@@ -69,7 +69,7 @@ impl Default for VersusSettings {
 }
 
 impl VersusSettings {
-    pub fn to_settings(&self) -> Settings {
+    pub fn to_settings(self) -> Settings {
         Settings {
             level: self.level,
             marathon_goal: 0,

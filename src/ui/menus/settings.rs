@@ -76,7 +76,7 @@ fn adjust_setting(settings: &mut Settings, sel: usize, direction: i32, mode: Gam
         match (settings.move_reset, direction) {
             (Some(n), 1) if n >= 30 => settings.move_reset = None,
             (Some(n), 1) => settings.move_reset = Some((n + 1).min(30)),
-            (Some(n), -1) if n == 0 => {}
+            (Some(0), -1) => {}
             (Some(n), -1) => settings.move_reset = Some(n - 1),
             (None, -1) => settings.move_reset = Some(30),
             _ => {}

@@ -246,7 +246,7 @@ impl Game {
             self.last_move = LastMove::Move;
             if self.lock_delay.is_some() {
                 if self.is_on_ground() {
-                    if self.move_reset.map_or(true, |limit| self.move_reset_count < limit) {
+                    if self.move_reset.is_none_or(|limit| self.move_reset_count < limit) {
                         self.lock_delay = Some(Instant::now());
                         self.move_reset_count += 1;
                     }
@@ -286,7 +286,7 @@ impl Game {
                     self.last_move = LastMove::Rotate;
                     if self.lock_delay.is_some() {
                         if self.is_on_ground() {
-                            if self.move_reset.map_or(true, |limit| self.move_reset_count < limit) {
+                            if self.move_reset.is_none_or(|limit| self.move_reset_count < limit) {
                                 self.lock_delay = Some(Instant::now());
                                 self.move_reset_count += 1;
                             }
@@ -305,7 +305,7 @@ impl Game {
                 self.last_move = LastMove::Rotate;
                 if self.lock_delay.is_some() {
                     if self.is_on_ground() {
-                        if self.move_reset.map_or(true, |limit| self.move_reset_count < limit) {
+                        if self.move_reset.is_none_or(|limit| self.move_reset_count < limit) {
                             self.lock_delay = Some(Instant::now());
                             self.move_reset_count += 1;
                         }
@@ -365,12 +365,10 @@ impl Game {
                     return;
                 }
             }
-        } else {
-            if !self.move_piece(1, 0) {
-                if self.lock_delay.is_none() {
-                    self.lock_delay = Some(Instant::now());
-                }
-            }
+        } else if !self.move_piece(1, 0)
+            && self.lock_delay.is_none()
+        {
+            self.lock_delay = Some(Instant::now());
         }
     }
 
@@ -494,11 +492,7 @@ impl Game {
             });
             self.last_action_time = Instant::now();
 
-            if is_difficult {
-                self.back_to_back = true;
-            } else {
-                self.back_to_back = false;
-            }
+            self.back_to_back = is_difficult;
 
             if self.mode == GameMode::Marathon || self.mode == GameMode::Endless {
                 let new_level = self.start_level + self.lines / 10;

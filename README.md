@@ -134,32 +134,38 @@ Pending garbage is absorbed when you clear lines (cancel before send). Uncleared
 
 ```
 src/
-  main.rs            Entry point, CLI args (--host/--join), terminal init/cleanup
-  ui/
-    menus.rs         Mode select, settings, records screens
-    menus_versus.rs  Versus Host/Join sub-menus with port/address input
-    game_loop.rs     Single-player game loop, DAS input, SFX dispatch
-    versus.rs        Versus game loop, lobby, countdown, garbage, rematch
+  main.rs              Entry point, CLI args (--host/--join), terminal init/cleanup
+  audio/
+    mod.rs             BGM and SFX playback (polyphonic synthesis)
+    bgm_score.rs       BGM note/melody data
   game/
-    types.rs         GameMode, LastMove, ClearAction, timing constants
-    mod.rs           Game struct and all gameplay logic
-    garbage.rs       Attack calculation, garbage queue, cancel logic
+    mod.rs             Game struct and all gameplay logic
+    types.rs           GameMode, LastMove, ClearAction, timing constants
+    piece.rs           Piece/Bag structs, SRS data (rotation states, kick tables)
+    settings.rs        Settings and VersusSettings structs
+    records.rs         Leaderboard persistence (JSON via serde)
+    garbage.rs         Attack calculation, garbage queue, cancel logic
   net/
-    protocol.rs      NetMessage enum, GarbageAttack, BoardSnapshot types
-    transport.rs     Connection: frame encoding/decoding, non-blocking TCP I/O
-    host.rs          TCP listener (non-blocking accept)
-    client.rs        TCP connect
-    mod.rs           Network module exports
+    mod.rs             Network module exports
+    protocol.rs        NetMessage enum, GarbageAttack, BoardSnapshot types
+    transport.rs       Connection: frame encoding/decoding, non-blocking TCP I/O
+    host.rs            TCP listener (non-blocking accept)
+    client.rs          TCP connect
   render/
-    board.rs         Single-player board rendering
-    versus.rs        Dual-board rendering, lobby/countdown/result screens
-    menus.rs         Menu/overlay rendering (pause, game over, settings, etc.)
-    mod.rs           Shared render utilities, title, piece preview
-  piece.rs           Piece/Bag structs, SRS data (rotation states, kick tables)
-  records.rs         Leaderboard persistence (JSON via serde)
-  audio.rs           BGM and SFX playback
-  settings.rs        Settings and VersusSettings structs
-  bgm_score.rs       BGM note/melody data
+    mod.rs             Shared render utilities, title, piece preview
+    board.rs           Single-player board rendering
+    menus.rs           Menu/overlay rendering (pause, game over, settings, etc.)
+    versus.rs          Dual-board rendering, lobby/countdown/result screens
+  ui/
+    mod.rs             Shared UI helpers (DAS state, menu nav, SFX wrappers)
+    input.rs           In-game key handling, DAS/ARR, gravity, lock delay
+    game_loop.rs       Single-player game loop, pause, game over, records
+    versus.rs          Versus game loop, lobby, countdown, garbage, rematch
+    menus/
+      mod.rs           Menu module exports
+      mode_select.rs   Mode select screen, records viewer
+      settings.rs      Settings menu (in-game and full)
+      versus.rs        Versus Host/Join sub-menus with port/address input
 ```
 
 ## Dependencies
