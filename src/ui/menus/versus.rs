@@ -45,6 +45,7 @@ fn draw_input_screen(
     input: &str,
     error: &str,
     selected: usize,
+    indent: usize,
 ) -> io::Result<()> {
     execute!(stdout, cursor::MoveTo(0, 0))?;
     render::draw_title(stdout)?;
@@ -52,15 +53,16 @@ fn draw_input_screen(
     let inner_w = BOARD_WIDTH * 2;
 
     let input_text = if selected == 0 {
-        format!("{}: {}█", label, input)
+        format!("{}█", input)
     } else {
-        format!("{}: {}", label, input)
+        input.to_string()
     };
     let mut content: Vec<Option<String>> = vec![
         None,
         Some(format!("{:^width$}", title, width = inner_w)),
         None,
-        Some(render::menu_item(&input_text, selected == 0, inner_w)),
+        Some(format!("{:^width$}", label, width = inner_w)),
+        Some(render::input_item(&input_text, selected == 0, indent, inner_w)),
     ];
 
     if !error.is_empty() {
@@ -100,7 +102,6 @@ pub fn run_versus_menu(
                 }
                 KeyCode::Enter => match sel {
                     0 => {
-                        // Host
                         play_menu_sfx(music, Sfx::MenuSelect);
                         match run_port_input(stdout, music)? {
                             Some(port) => return Ok(VersusAction::Host(port)),
@@ -108,7 +109,6 @@ pub fn run_versus_menu(
                         }
                     }
                     1 => {
-                        // Join
                         play_menu_sfx(music, Sfx::MenuSelect);
                         match run_addr_input(stdout, music)? {
                             Some(addr) => return Ok(VersusAction::Join(addr)),
@@ -116,7 +116,6 @@ pub fn run_versus_menu(
                         }
                     }
                     2 => {
-                        // Back
                         play_menu_sfx(music, Sfx::MenuBack);
                         return Ok(VersusAction::Back);
                     }
@@ -140,16 +139,17 @@ fn run_text_input(
     label: &str,
     default: &str,
     max_len: usize,
+    indent: usize,
     char_filter: fn(char) -> bool,
     validate: &dyn Fn(&str) -> Result<(), String>,
 ) -> io::Result<Option<String>> {
     let mut input = default.to_string();
     let mut error = String::new();
-    let mut sel: usize = 0; // 0=input, 1=confirm, 2=cancel
+    let mut sel: usize = 0;
     let count: usize = 3;
 
     loop {
-        draw_input_screen(stdout, title, label, &input, &error, sel)?;
+        draw_input_screen(stdout, title, label, &input, &error, sel, indent)?;
 
         if let Event::Key(KeyEvent { code, .. }) = event::read()? {
             match code {
@@ -203,6 +203,7 @@ fn run_port_input(
         "Port",
         "3000",
         5,
+        6,
         |c| c.is_ascii_digit(),
         &|s| match s.parse::<u16>() {
             Ok(port) if port > 0 => Ok(()),
@@ -222,7 +223,8 @@ fn run_addr_input(
         "JOIN GAME",
         "Address",
         "127.0.0.1:3000",
-        21,
+        17,
+        0,
         |c| c.is_ascii_graphic(),
         &|s| {
             if s.is_empty() {

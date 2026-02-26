@@ -14,10 +14,15 @@ use crate::game::piece::*;
 
 pub(crate) const LEFT_W: usize = 12;
 
+fn display_width(s: &str) -> usize {
+    s.chars().count()
+}
+
 pub(crate) fn centered_line(text: &str, selected: bool, inner_w: usize, dim: bool) -> String {
     let prefix = if selected { "> " } else { "  " };
     let prefix_len = prefix.len();
-    let total_pad = inner_w.saturating_sub(text.len());
+    let text_w = display_width(text);
+    let total_pad = inner_w.saturating_sub(text_w);
     let left_pad = total_pad / 2;
     let right_pad = total_pad - left_pad;
     let overflow = prefix_len.saturating_sub(left_pad);
@@ -38,6 +43,18 @@ pub(crate) fn centered_line(text: &str, selected: bool, inner_w: usize, dim: boo
 
 pub(crate) fn menu_item(label: &str, selected: bool, inner_w: usize) -> String {
     centered_line(label, selected, inner_w, false)
+}
+
+pub(crate) fn input_item(text: &str, selected: bool, indent: usize, inner_w: usize) -> String {
+    let prefix = if selected { "> " } else { "  " };
+    let text_w = display_width(text);
+    let right_pad = inner_w.saturating_sub(indent + prefix.len() + text_w);
+    let line = format!("{:ind$}{}{}{:rs$}", "", prefix, text, "", ind = indent, rs = right_pad);
+    if selected {
+        format!("{}", line.as_str().with(Color::Yellow))
+    } else {
+        line
+    }
 }
 
 pub(crate) fn settings_value(label: &str, value: &str, selected: bool, inner_w: usize) -> String {

@@ -3,7 +3,6 @@ use std::net::{Ipv4Addr, TcpListener, UdpSocket};
 
 use super::transport::Connection;
 
-/// Read the default gateway from the kernel routing table.
 fn default_gateway() -> Option<Ipv4Addr> {
     let content = std::fs::read_to_string("/proc/net/route").ok()?;
     for line in content.lines().skip(1) {
@@ -19,9 +18,6 @@ fn default_gateway() -> Option<Ipv4Addr> {
     None
 }
 
-/// Get the local LAN IP by connecting a UDP socket toward the default gateway.
-/// Falls back to connecting toward 8.8.8.8 if the gateway cannot be determined.
-/// Returns None if detection fails entirely (e.g. no network).
 pub fn local_ip() -> Option<std::net::IpAddr> {
     if let Some(gw) = default_gateway() {
         let socket = UdpSocket::bind("0.0.0.0:0").ok()?;
