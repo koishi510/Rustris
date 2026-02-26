@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/License-GPL--3.0-green?style=flat-square&logo=opensourceinitiative&logoColor=white)](./LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.85-orange?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 
-A guideline-compliant terminal Tetris written in Rust, with LAN multiplayer support.
+A guideline-compliant terminal Tetris with LAN multiplayer support.
 
 ## Install
 
