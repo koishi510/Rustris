@@ -10,7 +10,7 @@ use crate::net::transport::Connection;
 use crate::net::{BoardSnapshot, GarbageAttack, MatchOutcome, NetMessage, PROTOCOL_VERSION};
 use crate::game::piece::*;
 use crate::render;
-use crate::game::settings::{Settings, VersusSettings};
+use crate::game::settings::VersusSettings;
 
 use super::input::{self, InputState};
 use super::{menu_nav, play_menu_sfx, read_key};
@@ -54,19 +54,21 @@ fn perform_handshake(conn: &mut Connection, is_host: bool) -> io::Result<()> {
 pub fn run_host_lobby(
     stdout: &mut io::Stdout,
     music: &mut Option<audio::MusicPlayer>,
-    settings: &Settings,
     port: u16,
 ) -> io::Result<Option<(Connection, VersusSettings)>> {
     let listener = crate::net::host::listen_nonblocking(port)?;
 
-    let addr_line = match crate::net::host::local_ip() {
-        Some(ip) => format!("{}:{}", ip, port),
-        None => format!("Port: {}", port),
+    let addr_lines: Vec<String> = match crate::net::host::local_ip() {
+        Some(ip) => vec![format!("IP: {}", ip), format!("Port: {}", port)],
+        None => vec![format!("Port: {}", port)],
     };
 
     loop {
+        let lines: Vec<&str> = std::iter::once("Listening...")
+            .chain(addr_lines.iter().map(|s| s.as_str()))
+            .collect();
         render::versus::draw_lobby_screen(
-            stdout, "HOST GAME", &["Listening...", &addr_line], "", &["Cancel"], 0,
+            stdout, "HOST GAME", &lines, "", &["Cancel"], 0,
         )?;
 
         if event::poll(Duration::from_millis(100))? {
@@ -108,7 +110,7 @@ pub fn run_host_lobby(
                     }
                 }
 
-                let vs = VersusSettings::from_settings(settings);
+                let vs = VersusSettings::default();
                 conn.send(&NetMessage::LobbySettings(vs))?;
 
                 let msg = conn.recv_blocking()?;
@@ -135,9 +137,18 @@ pub fn run_client_lobby(
     music: &mut Option<audio::MusicPlayer>,
     addr: &str,
 ) -> io::Result<Option<(Connection, VersusSettings)>> {
-    render::versus::draw_lobby_screen(
-        stdout, "JOIN GAME", &["Connecting...", addr], "", &[], 0,
-    )?;
+    let (ip, port) = addr.rsplit_once(':').unwrap_or((addr, ""));
+    let addr_lines: Vec<String> = vec![format!("IP: {}", ip), format!("Port: {}", port)];
+    let addr_refs: Vec<&str> = addr_lines.iter().map(|s| s.as_str()).collect();
+
+    {
+        let lines: Vec<&str> = std::iter::once("Connecting...")
+            .chain(addr_refs.iter().copied())
+            .collect();
+        render::versus::draw_lobby_screen(
+            stdout, "JOIN GAME", &lines, "", &[], 0,
+        )?;
+    }
 
     let mut conn = match crate::net::client::connect(addr) {
         Ok(c) => c,
@@ -147,7 +158,7 @@ pub fn run_client_lobby(
             let count: usize = 2;
             loop {
                 render::versus::draw_lobby_screen(
-                    stdout, "JOIN GAME", &[addr], &error_msg, &["Retry", "Cancel"], sel,
+                    stdout, "JOIN GAME", &addr_refs, &error_msg, &["Retry", "Cancel"], sel,
                 )?;
                 if let Some(code) = read_key()? {
                     match code {

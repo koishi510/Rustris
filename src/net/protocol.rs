@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::game::piece::{BOARD_HEIGHT, BOARD_WIDTH};
+use crate::game::piece::{BOARD_WIDTH, BUFFER_HEIGHT, VISIBLE_HEIGHT};
 use crate::game::settings::VersusSettings;
 use crate::game::Game;
 
@@ -24,8 +24,8 @@ pub struct BoardSnapshot {
 
 impl BoardSnapshot {
     pub fn from_game(game: &Game, pending_garbage: u32) -> Self {
-        let mut board = Vec::with_capacity(BOARD_WIDTH * BOARD_HEIGHT);
-        for row in 0..BOARD_HEIGHT {
+        let mut board = Vec::with_capacity(BOARD_WIDTH * VISIBLE_HEIGHT);
+        for row in BUFFER_HEIGHT..(BUFFER_HEIGHT + VISIBLE_HEIGHT) {
             for col in 0..BOARD_WIDTH {
                 board.push(game.board[row][col]);
             }
@@ -34,7 +34,11 @@ impl BoardSnapshot {
         let current_cells = if game.is_animating() || game.in_are() {
             vec![]
         } else {
-            game.current.cells().to_vec()
+            game.current
+                .cells()
+                .iter()
+                .map(|&(r, c)| (r - BUFFER_HEIGHT as i32, c))
+                .collect()
         };
 
         let current_kind = game.current.kind;

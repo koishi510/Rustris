@@ -3,7 +3,9 @@ use rand::seq::SliceRandom;
 use rand::Rng;
 
 pub const BOARD_WIDTH: usize = 10;
-pub const BOARD_HEIGHT: usize = 20;
+pub const VISIBLE_HEIGHT: usize = 20;
+pub const BOARD_HEIGHT: usize = 40;
+pub const BUFFER_HEIGHT: usize = BOARD_HEIGHT - VISIBLE_HEIGHT;
 pub const EMPTY: u8 = 0;
 pub const GARBAGE_CELL: u8 = 8;
 pub const MAX_NEXT_COUNT: usize = 6;
@@ -131,7 +133,11 @@ pub struct Piece {
 
 impl Piece {
     pub fn new(kind: usize) -> Self {
-        let row = if kind == KIND_O { -1 } else { 0 };
+        let row = if kind == KIND_O {
+            BUFFER_HEIGHT as i32 - 1
+        } else {
+            BUFFER_HEIGHT as i32
+        };
         Self {
             kind,
             rotation: 0,
@@ -197,21 +203,21 @@ mod tests {
         let p = Piece::new(0);
         assert_eq!(p.kind, 0);
         assert_eq!(p.rotation, 0);
-        assert_eq!(p.row, 0);
+        assert_eq!(p.row, (BOARD_HEIGHT - VISIBLE_HEIGHT) as i32);
         assert_eq!(p.col, (BOARD_WIDTH as i32) / 2 - 1);
     }
 
     #[test]
     fn piece_new_o_spawn() {
         let p = Piece::new(KIND_O);
-        assert_eq!(p.row, -1);
+        assert_eq!(p.row, (BOARD_HEIGHT - VISIBLE_HEIGHT) as i32 - 1);
         assert_eq!(p.col, (BOARD_WIDTH as i32) / 2 - 1);
     }
 
     #[test]
     fn piece_new_t_spawn() {
         let p = Piece::new(KIND_T);
-        assert_eq!(p.row, 0);
+        assert_eq!(p.row, (BOARD_HEIGHT - VISIBLE_HEIGHT) as i32);
         assert_eq!(p.col, (BOARD_WIDTH as i32) / 2 - 1);
     }
 

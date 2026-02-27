@@ -18,8 +18,8 @@ pub fn draw_versus(
 
     let state = BoardRenderState::from_game(game);
 
-    let garbage_bar_height = (pending_garbage as usize).min(BOARD_HEIGHT);
-    let bar_start_row = BOARD_HEIGHT - garbage_bar_height;
+    let garbage_bar_height = (pending_garbage as usize).min(VISIBLE_HEIGHT);
+    let bar_start_row = VISIBLE_HEIGHT - garbage_bar_height;
 
     const VERSUS_TITLE_PAD: usize = 15;
     draw_title_padded(stdout, VERSUS_TITLE_PAD)?;
@@ -34,7 +34,8 @@ pub fn draw_versus(
     }
     write!(stdout, "╗\x1b[K\r\n")?;
 
-    for row in 0..BOARD_HEIGHT {
+    for row in 0..VISIBLE_HEIGHT {
+        let board_row = row + BUFFER_HEIGHT;
         match row {
             0 if game.next_count > 0 => {
                 write!(stdout, "{:<LEFT_W$}", "  NEXT:")?;
@@ -58,7 +59,7 @@ pub fn draw_versus(
         write!(stdout, "║")?;
 
         for col in 0..BOARD_WIDTH {
-            draw_board_cell(stdout, &game.board, row, col, &state)?;
+            draw_board_cell(stdout, &game.board, board_row, col, &state)?;
         }
 
         if row >= bar_start_row && garbage_bar_height > 0 {

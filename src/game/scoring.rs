@@ -110,7 +110,7 @@ impl Game {
                     continue;
                 }
                 new_board[dest] = temp_board[src];
-                dest = dest.wrapping_sub(1);
+                dest = dest.saturating_sub(1);
             }
             temp_board = new_board;
 

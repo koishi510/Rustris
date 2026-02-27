@@ -15,6 +15,12 @@ pub enum VersusAction {
     Back,
 }
 
+enum InputResult {
+    Confirm(String),
+    Back,
+    Cancel,
+}
+
 fn draw_versus_menu(
     stdout: &mut io::Stdout,
     selected: usize,
@@ -77,7 +83,8 @@ fn draw_input_screen(
 
     content.push(None);
     content.push(Some(render::menu_item("Confirm", selected == 1, inner_w)));
-    content.push(Some(render::menu_item("Cancel", selected == 2, inner_w)));
+    content.push(Some(render::menu_item("Back", selected == 2, inner_w)));
+    content.push(Some(render::menu_item("Cancel", selected == 3, inner_w)));
     content.push(None);
 
     render::draw_full_board_overlay(stdout, &content)
@@ -104,15 +111,21 @@ pub fn run_versus_menu(
                     0 => {
                         play_menu_sfx(music, Sfx::MenuSelect);
                         match run_port_input(stdout, music)? {
-                            Some(port) => return Ok(VersusAction::Host(port)),
-                            None => continue,
+                            InputResult::Confirm(port) => {
+                                if let Ok(p) = port.parse::<u16>() {
+                                    return Ok(VersusAction::Host(p));
+                                }
+                            }
+                            InputResult::Back => continue,
+                            InputResult::Cancel => return Ok(VersusAction::Back),
                         }
                     }
                     1 => {
                         play_menu_sfx(music, Sfx::MenuSelect);
                         match run_addr_input(stdout, music)? {
-                            Some(addr) => return Ok(VersusAction::Join(addr)),
-                            None => continue,
+                            InputResult::Confirm(addr) => return Ok(VersusAction::Join(addr)),
+                            InputResult::Back => continue,
+                            InputResult::Cancel => return Ok(VersusAction::Back),
                         }
                     }
                     2 => {
@@ -142,11 +155,11 @@ fn run_text_input(
     indent: usize,
     char_filter: fn(char) -> bool,
     validate: &dyn Fn(&str) -> Result<(), String>,
-) -> io::Result<Option<String>> {
+) -> io::Result<InputResult> {
     let mut input = default.to_string();
     let mut error = String::new();
     let mut sel: usize = 0;
-    let count: usize = 3;
+    let count: usize = 4;
 
     loop {
         draw_input_screen(stdout, title, label, &input, &error, sel, indent)?;
@@ -171,20 +184,24 @@ fn run_text_input(
                     0 | 1 => match validate(&input) {
                         Ok(()) => {
                             play_menu_sfx(music, Sfx::MenuSelect);
-                            return Ok(Some(input));
+                            return Ok(InputResult::Confirm(input));
                         }
                         Err(msg) => {
                             error = msg;
                         }
                     },
+                    2 => {
+                        play_menu_sfx(music, Sfx::MenuBack);
+                        return Ok(InputResult::Back);
+                    }
                     _ => {
                         play_menu_sfx(music, Sfx::MenuBack);
-                        return Ok(None);
+                        return Ok(InputResult::Cancel);
                     }
                 },
                 KeyCode::Esc => {
                     play_menu_sfx(music, Sfx::MenuBack);
-                    return Ok(None);
+                    return Ok(InputResult::Back);
                 }
                 _ => {}
             }
@@ -195,8 +212,8 @@ fn run_text_input(
 fn run_port_input(
     stdout: &mut io::Stdout,
     music: &mut Option<audio::MusicPlayer>,
-) -> io::Result<Option<u16>> {
-    let result = run_text_input(
+) -> io::Result<InputResult> {
+    run_text_input(
         stdout,
         music,
         "HOST GAME",
@@ -209,31 +226,59 @@ fn run_port_input(
             Ok(port) if port > 0 => Ok(()),
             _ => Err("Invalid port".to_string()),
         },
-    )?;
-    Ok(result.and_then(|s| s.parse::<u16>().ok()))
+    )
 }
 
 fn run_addr_input(
     stdout: &mut io::Stdout,
     music: &mut Option<audio::MusicPlayer>,
-) -> io::Result<Option<String>> {
-    run_text_input(
-        stdout,
-        music,
-        "JOIN GAME",
-        "Address",
-        "127.0.0.1:3000",
-        17,
-        0,
-        |c| c.is_ascii_graphic(),
-        &|s| {
-            if s.is_empty() {
-                Err("Enter an address".to_string())
-            } else if !s.contains(':') {
-                Err("Use host:port format".to_string())
-            } else {
-                Ok(())
+) -> io::Result<InputResult> {
+    'ip: loop {
+        let ip = match run_text_input(
+            stdout,
+            music,
+            "JOIN GAME",
+            "IP Address",
+            "127.0.0.1",
+            15,
+            1,
+            |c| c.is_ascii_digit() || c == '.',
+            &|s| {
+                if s.is_empty() {
+                    Err("Enter an address".to_string())
+                } else if s.split('.').count() != 4
+                    || s.split('.').any(|p| p.is_empty() || p.parse::<u8>().is_err())
+                {
+                    Err("Invalid IP".to_string())
+                } else {
+                    Ok(())
+                }
+            },
+        )? {
+            InputResult::Confirm(ip) => ip,
+            InputResult::Back => return Ok(InputResult::Back),
+            InputResult::Cancel => return Ok(InputResult::Cancel),
+        };
+
+        match run_text_input(
+            stdout,
+            music,
+            "JOIN GAME",
+            "Port",
+            "3000",
+            5,
+            6,
+            |c| c.is_ascii_digit(),
+            &|s| match s.parse::<u16>() {
+                Ok(p) if p > 0 => Ok(()),
+                _ => Err("Invalid port".to_string()),
+            },
+        )? {
+            InputResult::Confirm(port) => {
+                return Ok(InputResult::Confirm(format!("{}:{}", ip, port)));
             }
-        },
-    )
+            InputResult::Back => continue 'ip,
+            InputResult::Cancel => return Ok(InputResult::Cancel),
+        }
+    }
 }

@@ -151,7 +151,7 @@ pub fn draw_help(stdout: &mut io::Stdout, selected: usize) -> io::Result<()> {
         None,
     ];
 
-    let start_row = (BOARD_HEIGHT - content.len()) / 2;
+    let start_row = (VISIBLE_HEIGHT - content.len()) / 2;
 
     write!(stdout, "{:LEFT_W$}╔", "")?;
     for _ in 0..BOARD_WIDTH {
@@ -159,7 +159,7 @@ pub fn draw_help(stdout: &mut io::Stdout, selected: usize) -> io::Result<()> {
     }
     write!(stdout, "╗\x1b[K\r\n")?;
 
-    for row in 0..BOARD_HEIGHT {
+    for row in 0..VISIBLE_HEIGHT {
         write!(stdout, "{:LEFT_W$}║", "")?;
         if row >= start_row && row - start_row < content.len() {
             match &content[row - start_row] {

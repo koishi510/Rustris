@@ -87,17 +87,4 @@ impl VersusSettings {
         }
     }
 
-    pub fn from_settings(s: &Settings) -> Self {
-        Self {
-            level: s.level,
-            ghost: s.ghost,
-            line_clear_anim: s.line_clear_anim,
-            next_count: s.next_count,
-            bag_randomizer: s.bag_randomizer,
-            srs: s.srs,
-            hold_enabled: s.hold_enabled,
-            lock_delay_ms: s.lock_delay_ms,
-            move_reset: s.move_reset,
-        }
-    }
 }

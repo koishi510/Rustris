@@ -144,6 +144,9 @@ impl Game {
 
         if lines_to_apply >= total_lines {
             self.garbage_rise_anim = None;
+            if self.has_blocks_in_buffer() {
+                self.game_over = true;
+            }
             return false;
         }
 

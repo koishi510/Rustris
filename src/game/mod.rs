@@ -211,6 +211,17 @@ impl Game {
         }
     }
 
+    pub fn has_blocks_in_buffer(&self) -> bool {
+        for r in 0..BUFFER_HEIGHT {
+            for c in 0..BOARD_WIDTH {
+                if self.board[r][c] != EMPTY {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
     pub fn update_elapsed(&mut self) {
         self.elapsed = self.game_start.elapsed();
     }

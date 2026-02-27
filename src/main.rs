@@ -35,7 +35,7 @@ fn main() -> io::Result<()> {
                 let action = ui::run_versus_menu(&mut stdout, &mut music, &mut settings)?;
                 match action {
                     ui::VersusAction::Host(port) => {
-                        let lobby = ui::versus::run_host_lobby(&mut stdout, &mut music, &settings, port)?;
+                        let lobby = ui::versus::run_host_lobby(&mut stdout, &mut music, port)?;
                         if let Some((mut conn, vs_settings)) = lobby {
                             let quit = ui::versus::run_versus(&mut stdout, &mut music, &mut conn, &vs_settings, true)?;
                             if quit {

@@ -46,14 +46,14 @@ pub(crate) fn menu_item(label: &str, selected: bool, inner_w: usize) -> String {
 }
 
 pub(crate) fn input_item(text: &str, selected: bool, indent: usize, inner_w: usize) -> String {
-    let prefix = if selected { "> " } else { "  " };
-    let text_w = display_width(text);
-    let right_pad = inner_w.saturating_sub(indent + prefix.len() + text_w);
-    let line = format!("{:ind$}{}{}{:rs$}", "", prefix, text, "", ind = indent, rs = right_pad);
     if selected {
+        let prefix = "> ";
+        let text_w = display_width(text);
+        let right_pad = inner_w.saturating_sub(indent + prefix.len() + text_w);
+        let line = format!("{:ind$}{}{}{:rs$}", "", prefix, text, "", ind = indent, rs = right_pad);
         format!("{}", line.as_str().with(Color::Yellow))
     } else {
-        line
+        format!("{:^width$}", text, width = inner_w)
     }
 }
 
@@ -146,24 +146,24 @@ impl BoardRenderState {
 pub(crate) fn draw_board_cell(
     stdout: &mut io::Stdout,
     board: &[[u8; BOARD_WIDTH]; BOARD_HEIGHT],
-    row: usize,
+    board_row: usize,
     col: usize,
     state: &BoardRenderState,
 ) -> io::Result<()> {
-    if state.anim_rows.contains(&row) {
+    if state.anim_rows.contains(&board_row) {
         match state.anim_phase {
             0 => write!(stdout, "{}", "██".with(Color::White))?,
             1 => write!(stdout, "{}", "▓▓".with(Color::DarkGrey))?,
             _ => write!(stdout, "  ")?,
         }
-    } else if state.current_cells.contains(&(row as i32, col as i32)) {
+    } else if state.current_cells.contains(&(board_row as i32, col as i32)) {
         write!(stdout, "{}", "██".with(state.current_color))?;
-    } else if state.ghost_cells.contains(&(row as i32, col as i32))
-        && board[row][col] == EMPTY
+    } else if state.ghost_cells.contains(&(board_row as i32, col as i32))
+        && board[board_row][col] == EMPTY
     {
         write!(stdout, "{}", "░░".with(state.current_color))?;
     } else {
-        let id = board[row][col];
+        let id = board[board_row][col];
         if id == EMPTY {
             write!(stdout, "  ")?;
         } else {
@@ -283,7 +283,7 @@ pub(crate) fn draw_full_board_overlay(
     content: &[Option<String>],
 ) -> io::Result<()> {
     let inner_w = BOARD_WIDTH * 2;
-    let start_row = (BOARD_HEIGHT - content.len()) / 2;
+    let start_row = (VISIBLE_HEIGHT - content.len()) / 2;
 
     write!(stdout, "{:LEFT_W$}╔", "")?;
     for _ in 0..BOARD_WIDTH {
@@ -291,7 +291,7 @@ pub(crate) fn draw_full_board_overlay(
     }
     write!(stdout, "╗\x1b[K\r\n")?;
 
-    for row in 0..BOARD_HEIGHT {
+    for row in 0..VISIBLE_HEIGHT {
         write!(stdout, "{:LEFT_W$}║", "")?;
         if row >= start_row && row - start_row < content.len() {
             match &content[row - start_row] {

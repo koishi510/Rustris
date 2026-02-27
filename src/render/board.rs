@@ -18,7 +18,8 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
     }
     write!(stdout, "╗\x1b[K\r\n")?;
 
-    for row in 0..BOARD_HEIGHT {
+    for row in 0..VISIBLE_HEIGHT {
+        let board_row = row + BUFFER_HEIGHT;
         match row {
             0 if game.next_count > 0 => {
                 write!(stdout, "{:<LEFT_W$}", "  NEXT:")?;
@@ -45,7 +46,7 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
 
         write!(stdout, "║")?;
         for col in 0..BOARD_WIDTH {
-            draw_board_cell(stdout, &game.board, row, col, &state)?;
+            draw_board_cell(stdout, &game.board, board_row, col, &state)?;
         }
 
         write!(stdout, "║")?;
