@@ -1,7 +1,7 @@
-mod mode_select;
+mod modes;
 mod settings;
 mod versus;
 
-pub use mode_select::select_mode;
+pub(super) use modes::select_mode;
 pub(crate) use settings::run_settings;
-pub use versus::{run_versus_menu, VersusAction};
+pub(super) use versus::{run_versus_menu, VersusAction};

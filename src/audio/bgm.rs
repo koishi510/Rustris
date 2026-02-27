@@ -248,7 +248,7 @@ const SECTION_C: &[(f32, f32, f32)] = &[
 
 const CYCLE: &[&[(f32, f32, f32)]] = &[SECTION_AB, SECTION_AB, SECTION_C, SECTION_AB];
 
-fn build_notes() -> Vec<(f32, f32, f32)> {
+pub(super) fn build_notes() -> Vec<(f32, f32, f32)> {
     let mut notes = Vec::with_capacity(530);
     for (i, section) in CYCLE.iter().enumerate() {
         let offset = i as f32 * 32.0;
