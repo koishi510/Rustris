@@ -30,28 +30,24 @@ pub fn select_mode(
                     play_menu_sfx(music, Sfx::MenuMove);
                 }
                 KeyCode::Left => {
-                    if sel == 0 {
-                        mode = match mode {
-                            GameMode::Marathon => GameMode::Versus,
-                            GameMode::Sprint => GameMode::Marathon,
-                            GameMode::Ultra => GameMode::Sprint,
-                            GameMode::Endless => GameMode::Ultra,
-                            GameMode::Versus => GameMode::Endless,
-                        };
-                        play_menu_sfx(music, Sfx::MenuMove);
-                    }
+                    mode = match mode {
+                        GameMode::Marathon => GameMode::Versus,
+                        GameMode::Sprint => GameMode::Marathon,
+                        GameMode::Ultra => GameMode::Sprint,
+                        GameMode::Endless => GameMode::Ultra,
+                        GameMode::Versus => GameMode::Endless,
+                    };
+                    play_menu_sfx(music, Sfx::MenuMove);
                 }
                 KeyCode::Right => {
-                    if sel == 0 {
-                        mode = match mode {
-                            GameMode::Marathon => GameMode::Sprint,
-                            GameMode::Sprint => GameMode::Ultra,
-                            GameMode::Ultra => GameMode::Endless,
-                            GameMode::Endless => GameMode::Versus,
-                            GameMode::Versus => GameMode::Marathon,
-                        };
-                        play_menu_sfx(music, Sfx::MenuMove);
-                    }
+                    mode = match mode {
+                        GameMode::Marathon => GameMode::Sprint,
+                        GameMode::Sprint => GameMode::Ultra,
+                        GameMode::Ultra => GameMode::Endless,
+                        GameMode::Endless => GameMode::Versus,
+                        GameMode::Versus => GameMode::Marathon,
+                    };
+                    play_menu_sfx(music, Sfx::MenuMove);
                 }
                 KeyCode::Enter => {
                     if sel == 1 {

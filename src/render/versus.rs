@@ -253,7 +253,8 @@ pub fn draw_versus_forfeit(
         Some(format!("{:^width$}", "FORFEIT?", width = inner_w)),
         None,
         Some(menu_item("Continue", selected == 0, inner_w)),
-        Some(menu_item("Forfeit", selected == 1, inner_w)),
+        Some(menu_item("Settings", selected == 1, inner_w)),
+        Some(menu_item("Forfeit", selected == 2, inner_w)),
         None,
     ];
 

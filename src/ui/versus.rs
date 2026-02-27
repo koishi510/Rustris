@@ -279,7 +279,7 @@ pub fn run_versus(
             return Ok(false);
         }
 
-        let game_settings = vs_settings.to_settings();
+        let mut game_settings = vs_settings.to_settings();
         let mut game = Game::new(GameMode::Versus, &game_settings);
         let mut garbage_queue = GarbageQueue::new();
         let mut opponent_snapshot: Option<BoardSnapshot> = None;
@@ -409,7 +409,7 @@ pub fn run_versus(
                                 m.play_sfx(Sfx::Pause);
                             }
                             let mut sel: usize = 0;
-                            let count: usize = 2;
+                            let count: usize = 3;
                             let mut forfeit = false;
                             loop {
                                 render::versus::draw_versus_forfeit(stdout, sel)?;
@@ -428,6 +428,10 @@ pub fn run_versus(
                                                 break;
                                             }
                                             1 => {
+                                                play_menu_sfx(music, Sfx::MenuSelect);
+                                                super::menus::run_settings(stdout, music, &mut game_settings, GameMode::Versus, true)?;
+                                            }
+                                            2 => {
                                                 forfeit = true;
                                                 break;
                                             }

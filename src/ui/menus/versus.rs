@@ -84,7 +84,7 @@ fn draw_input_screen(
     content.push(None);
     content.push(Some(render::menu_item("Confirm", selected == 1, inner_w)));
     content.push(Some(render::menu_item("Back", selected == 2, inner_w)));
-    content.push(Some(render::menu_item("Cancel", selected == 3, inner_w)));
+    content.push(Some(render::menu_item("Menu", selected == 3, inner_w)));
     content.push(None);
 
     render::draw_full_board_overlay(stdout, &content)
