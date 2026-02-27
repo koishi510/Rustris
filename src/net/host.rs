@@ -19,7 +19,38 @@ fn default_gateway() -> Option<Ipv4Addr> {
     None
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "macos")]
+fn default_gateway() -> Option<Ipv4Addr> {
+    let output = std::process::Command::new("route")
+        .args(["-n", "get", "default"])
+        .output()
+        .ok()?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    for line in stdout.lines() {
+        if let Some(gw) = line.trim().strip_prefix("gateway:") {
+            return gw.trim().parse().ok();
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn default_gateway() -> Option<Ipv4Addr> {
+    let output = std::process::Command::new("route")
+        .args(["print", "0.0.0.0"])
+        .output()
+        .ok()?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    for line in stdout.lines() {
+        let fields: Vec<&str> = line.split_whitespace().collect();
+        if fields.len() >= 3 && fields[0] == "0.0.0.0" && fields[1] == "0.0.0.0" {
+            return fields[2].parse().ok();
+        }
+    }
+    None
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
 fn default_gateway() -> Option<Ipv4Addr> {
     None
 }
