@@ -141,12 +141,13 @@ pub fn run_client_lobby(
 
     let mut conn = match crate::net::client::connect(addr) {
         Ok(c) => c,
-        Err(_) => {
+        Err(e) => {
+            let error_msg = format!("{:?}", e.kind());
             let mut sel: usize = 0;
             let count: usize = 2;
             loop {
                 render::versus::draw_lobby_screen(
-                    stdout, "JOIN GAME", &[addr], "Connection failed", &["Retry", "Cancel"], sel,
+                    stdout, "JOIN GAME", &[addr], &error_msg, &["Retry", "Cancel"], sel,
                 )?;
                 if let Some(code) = read_key()? {
                     match code {
