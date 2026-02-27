@@ -8,7 +8,7 @@ authors = ["koishi <kkoishichan@gmail.com>"]
 license = "GPL-3.0"
 repository = "https://github.com/koishi510/Rustris"
 readme = "README.md"
-keywords = ["tetris", "terminal", "game", "tui", "cli", "lan", "multiplayer"]
+keywords = ["tetris", "terminal", "game", "tui", "multiplayer"]
 categories = ["games"]
 
 [dependencies]
