@@ -31,6 +31,10 @@ cargo run --release
 
 ## Game Modes
 
+<p align="center">
+  <img src="assets/demo_solo.gif" alt="Solo gameplay">
+</p>
+
 | Mode     | Objective                                                    |
 | -------- | ------------------------------------------------------------ |
 | Marathon | Clear a target number of lines (default 150)                 |
@@ -40,6 +44,10 @@ cargo run --release
 | Versus   | LAN 1v1 - send garbage lines to your opponent                |
 
 ## Versus Mode (LAN Multiplayer)
+
+<p align="center">
+  <img src="assets/demo_pvp.gif" alt="Versus gameplay">
+</p>
 
 Play 1v1 over a local network. One player hosts, the other joins.
 
