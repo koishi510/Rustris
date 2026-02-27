@@ -1,5 +1,4 @@
-// Korobeiniki (Tetris Theme)
-// Structure: [AB, AB, C, AB] x4 = 512 beats
+// Korobeiniki — (beat, duration, frequency)
 
 #[rustfmt::skip]
 const SECTION_AB: &[(f32, f32, f32)] = &[
@@ -247,7 +246,6 @@ const SECTION_C: &[(f32, f32, f32)] = &[
     (31.50, 0.50, 164.81),
 ];
 
-// One cycle: AB AB C AB = 128 beats, looped by the player
 const CYCLE: &[&[(f32, f32, f32)]] = &[SECTION_AB, SECTION_AB, SECTION_C, SECTION_AB];
 
 fn build_notes() -> Vec<(f32, f32, f32)> {
