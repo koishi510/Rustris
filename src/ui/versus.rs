@@ -17,6 +17,12 @@ use super::{menu_nav, play_menu_sfx, read_key};
 
 const BOARD_SYNC_INTERVAL: Duration = Duration::from_millis(66);
 
+pub enum LobbyResult {
+    Connected(Connection, VersusSettings),
+    Back,
+    Menu,
+}
+
 fn perform_handshake(conn: &mut Connection, is_host: bool) -> io::Result<()> {
     if is_host {
         conn.send(&NetMessage::Hello { version: PROTOCOL_VERSION })?;
@@ -55,7 +61,7 @@ pub fn run_host_lobby(
     stdout: &mut io::Stdout,
     music: &mut Option<audio::MusicPlayer>,
     port: u16,
-) -> io::Result<Option<(Connection, VersusSettings)>> {
+) -> io::Result<LobbyResult> {
     let listener = crate::net::host::listen_nonblocking(port)?;
 
     let addr_lines: Vec<String> = match crate::net::host::local_ip() {
@@ -63,19 +69,31 @@ pub fn run_host_lobby(
         None => vec![format!("Port: {}", port)],
     };
 
+    let mut sel: usize = 0;
     loop {
         let lines: Vec<&str> = std::iter::once("Listening...")
             .chain(addr_lines.iter().map(|s| s.as_str()))
             .collect();
         render::versus::draw_lobby_screen(
-            stdout, "HOST GAME", &lines, "", &["Cancel"], 0,
+            stdout, "HOST GAME", &lines, "", &["Back", "Menu"], sel,
         )?;
 
         if event::poll(Duration::from_millis(100))? {
             if let Some(code) = read_key()? {
-                if code == KeyCode::Enter || code == KeyCode::Esc {
-                    play_menu_sfx(music, Sfx::MenuBack);
-                    return Ok(None);
+                match code {
+                    KeyCode::Up | KeyCode::Down => {
+                        sel = menu_nav(sel, 2, code);
+                        play_menu_sfx(music, Sfx::MenuMove);
+                    }
+                    KeyCode::Enter => {
+                        play_menu_sfx(music, Sfx::MenuBack);
+                        return Ok(if sel == 0 { LobbyResult::Back } else { LobbyResult::Menu });
+                    }
+                    KeyCode::Esc => {
+                        play_menu_sfx(music, Sfx::MenuBack);
+                        return Ok(LobbyResult::Back);
+                    }
+                    _ => {}
                 }
             }
         }
@@ -102,7 +120,7 @@ pub fn run_host_lobby(
                                 }
                                 KeyCode::Enter | KeyCode::Esc => {
                                     play_menu_sfx(music, Sfx::MenuBack);
-                                    return Ok(None);
+                                    return Ok(LobbyResult::Back);
                                 }
                                 _ => {}
                             }
@@ -124,7 +142,7 @@ pub fn run_host_lobby(
                     }
                 }
 
-                return Ok(Some((conn, vs)));
+                return Ok(LobbyResult::Connected(conn, vs));
             }
             Ok(None) => {}
             Err(e) => return Err(e),
@@ -136,7 +154,7 @@ pub fn run_client_lobby(
     stdout: &mut io::Stdout,
     music: &mut Option<audio::MusicPlayer>,
     addr: &str,
-) -> io::Result<Option<(Connection, VersusSettings)>> {
+) -> io::Result<LobbyResult> {
     let (ip, port) = addr.rsplit_once(':').unwrap_or((addr, ""));
     let addr_lines: Vec<String> = vec![format!("IP: {}", ip), format!("Port: {}", port)];
     let addr_refs: Vec<&str> = addr_lines.iter().map(|s| s.as_str()).collect();
@@ -155,10 +173,10 @@ pub fn run_client_lobby(
         Err(e) => {
             let error_msg = format!("{:?}", e.kind());
             let mut sel: usize = 0;
-            let count: usize = 2;
+            let count: usize = 3;
             loop {
                 render::versus::draw_lobby_screen(
-                    stdout, "JOIN GAME", &addr_refs, &error_msg, &["Retry", "Cancel"], sel,
+                    stdout, "JOIN GAME", &addr_refs, &error_msg, &["Retry", "Back", "Menu"], sel,
                 )?;
                 if let Some(code) = read_key()? {
                     match code {
@@ -171,14 +189,18 @@ pub fn run_client_lobby(
                                 play_menu_sfx(music, Sfx::MenuSelect);
                                 return run_client_lobby(stdout, music, addr);
                             }
+                            1 => {
+                                play_menu_sfx(music, Sfx::MenuBack);
+                                return Ok(LobbyResult::Back);
+                            }
                             _ => {
                                 play_menu_sfx(music, Sfx::MenuBack);
-                                return Ok(None);
+                                return Ok(LobbyResult::Menu);
                             }
                         },
                         KeyCode::Esc => {
                             play_menu_sfx(music, Sfx::MenuBack);
-                            return Ok(None);
+                            return Ok(LobbyResult::Back);
                         }
                         _ => {}
                     }
@@ -207,7 +229,7 @@ pub fn run_client_lobby(
                     }
                     KeyCode::Enter | KeyCode::Esc => {
                         play_menu_sfx(music, Sfx::MenuBack);
-                        return Ok(None);
+                        return Ok(LobbyResult::Back);
                     }
                     _ => {}
                 }
@@ -230,7 +252,7 @@ pub fn run_client_lobby(
 
     play_menu_sfx(music, Sfx::MenuSelect);
 
-    Ok(Some((conn, vs)))
+    Ok(LobbyResult::Connected(conn, vs))
 }
 
 fn run_countdown(
@@ -279,7 +301,7 @@ pub fn run_versus(
             return Ok(false);
         }
 
-        let mut game_settings = vs_settings.to_settings();
+        let game_settings = vs_settings.to_settings();
         let mut game = Game::new(GameMode::Versus, &game_settings);
         let mut garbage_queue = GarbageQueue::new();
         let mut opponent_snapshot: Option<BoardSnapshot> = None;
@@ -288,6 +310,7 @@ pub fn run_versus(
         let mut last_board_sync = Instant::now();
         let mut opponent_dead = false;
         let mut we_died = false;
+        let mut forfeit_sel: Option<usize> = None;
 
         if let Some(m) = music.as_mut() {
             m.play();
@@ -310,12 +333,20 @@ pub fn run_versus(
 
             game.update_elapsed();
 
-            render::versus::draw_versus(
-                stdout,
-                &game,
-                &opponent_snapshot,
-                garbage_queue.total_pending(),
-            )?;
+            if let Some(sel) = forfeit_sel {
+                let (bgm_on, sfx_on) = match music.as_ref() {
+                    Some(m) => (m.bgm_enabled(), m.sfx_enabled()),
+                    None => (false, false),
+                };
+                render::versus::draw_versus_forfeit(stdout, bgm_on, sfx_on, sel)?;
+            } else {
+                render::versus::draw_versus(
+                    stdout,
+                    &game,
+                    &opponent_snapshot,
+                    garbage_queue.total_pending(),
+                )?;
+            }
 
             if last_board_sync.elapsed() >= BOARD_SYNC_INTERVAL {
                 let snap = BoardSnapshot::from_game(&game, garbage_queue.total_pending());
@@ -366,17 +397,9 @@ pub fn run_versus(
                 break;
             }
 
-            if game.is_animating() {
-                if game.update_animation() {
-                    if event::poll(Duration::from_millis(16))? {
-                        let _ = read_key()?;
-                    }
-                    continue;
-                } else {
-                    game.finish_clear();
-                    inp.last_tick = Instant::now();
-                    continue;
-                }
+            if game.is_animating() && !game.update_animation() {
+                game.finish_clear();
+                inp.last_tick = Instant::now();
             }
 
             if game.is_garbage_animating() {
@@ -384,109 +407,125 @@ pub fn run_versus(
                     if let Some(m) = music.as_ref() {
                         m.play_sfx(Sfx::GarbageReceived);
                     }
-                    render::versus::draw_versus(
-                        stdout,
-                        &game,
-                        &opponent_snapshot,
-                        garbage_queue.total_pending(),
-                    )?;
-                    if event::poll(Duration::from_millis(16))? {
-                        let _ = read_key()?;
-                    }
-                    continue;
+                } else {
+                    inp.last_tick = Instant::now();
                 }
-                inp.last_tick = Instant::now();
             }
 
-            let mut timeout = input::compute_timeout(&game, &inp);
-            timeout = timeout.min(Duration::from_millis(16));
+            let timeout = if forfeit_sel.is_some() || game.is_animating() || game.is_garbage_animating() {
+                Duration::from_millis(16)
+            } else {
+                input::compute_timeout(&game, &inp).min(Duration::from_millis(16))
+            };
 
             if event::poll(timeout)? {
                 if let Some(code) = read_key()? {
-                    match code {
-                        KeyCode::Esc => {
-                            if let Some(m) = music.as_mut() {
-                                m.play_sfx(Sfx::Pause);
+                    if let Some(sel) = forfeit_sel.as_mut() {
+                        match code {
+                            KeyCode::Up | KeyCode::Down => {
+                                *sel = menu_nav(*sel, 4, code);
+                                play_menu_sfx(music, Sfx::MenuMove);
                             }
-                            let mut sel: usize = 0;
-                            let count: usize = 3;
-                            let mut forfeit = false;
-                            loop {
-                                render::versus::draw_versus_forfeit(stdout, sel)?;
-
-                                if let Some(code) = read_key()? {
-                                    match code {
-                                        KeyCode::Up | KeyCode::Down => {
-                                            sel = menu_nav(sel, count, code);
-                                            play_menu_sfx(music, Sfx::MenuMove);
-                                        }
-                                        KeyCode::Enter => match sel {
-                                            0 => {
-                                                if let Some(m) = music.as_ref() {
-                                                    m.play_sfx(Sfx::Resume);
-                                                }
-                                                break;
-                                            }
-                                            1 => {
-                                                play_menu_sfx(music, Sfx::MenuSelect);
-                                                super::menus::run_settings(stdout, music, &mut game_settings, GameMode::Versus, true)?;
-                                            }
-                                            2 => {
-                                                forfeit = true;
-                                                break;
-                                            }
-                                            _ => {}
-                                        },
-                                        KeyCode::Esc => {
-                                            if let Some(m) = music.as_ref() {
-                                                m.play_sfx(Sfx::Resume);
-                                            }
-                                            break;
-                                        }
-                                        _ => {}
+                            KeyCode::Left | KeyCode::Right => match *sel {
+                                0 => {
+                                    if let Some(m) = music.as_mut() {
+                                        m.toggle_bgm();
+                                        m.play_sfx(Sfx::MenuMove);
                                     }
                                 }
+                                1 => {
+                                    if let Some(m) = music.as_mut() {
+                                        m.toggle_sfx();
+                                        m.play_sfx(Sfx::MenuMove);
+                                    }
+                                }
+                                _ => {}
                             }
-                            if forfeit {
-                                game.game_over = true;
-                                continue;
+                            KeyCode::Enter => match *sel {
+                                0 => {
+                                    if let Some(m) = music.as_mut() {
+                                        m.toggle_bgm();
+                                        m.play_sfx(Sfx::MenuMove);
+                                    }
+                                }
+                                1 => {
+                                    if let Some(m) = music.as_mut() {
+                                        m.toggle_sfx();
+                                        m.play_sfx(Sfx::MenuMove);
+                                    }
+                                }
+                                2 => {
+                                    if let Some(m) = music.as_ref() {
+                                        m.play_sfx(Sfx::Resume);
+                                    }
+                                    forfeit_sel = None;
+                                    inp.last_tick = Instant::now();
+                                    if let Some(d) = &mut inp.das {
+                                        let now = Instant::now();
+                                        d.last_event = now;
+                                        d.start = now;
+                                        d.last_arr_move = now;
+                                    }
+                                    execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
+                                }
+                                3 => {
+                                    game.game_over = true;
+                                    forfeit_sel = None;
+                                }
+                                _ => {}
+                            },
+                            KeyCode::Esc => {
+                                if let Some(m) = music.as_ref() {
+                                    m.play_sfx(Sfx::Resume);
+                                }
+                                forfeit_sel = None;
+                                inp.last_tick = Instant::now();
+                                if let Some(d) = &mut inp.das {
+                                    let now = Instant::now();
+                                    d.last_event = now;
+                                    d.start = now;
+                                    d.last_arr_move = now;
+                                }
+                                execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
                             }
-                            if game.lock_delay.is_some() {
-                                game.lock_delay = Some(Instant::now());
-                            }
-                            inp.last_tick = Instant::now();
-                            if let Some(d) = &mut inp.das {
-                                let now = Instant::now();
-                                d.last_event = now;
-                                d.start = now;
-                                d.last_arr_move = now;
-                            }
-                            execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
-                            continue;
+                            _ => {}
                         }
-                        other => {
-                            let hard_dropped = input::handle_game_key(other, &mut game, &mut inp, music);
-                            if hard_dropped {
-                                process_post_lock(
-                                    &mut game,
-                                    &mut garbage_queue,
-                                    conn,
-                                    music,
-                                )?;
+                    } else {
+                        match code {
+                            KeyCode::Esc => {
+                                if let Some(m) = music.as_ref() {
+                                    m.play_sfx(Sfx::Pause);
+                                }
+                                forfeit_sel = Some(0);
+                            }
+                            other => {
+                                if !game.is_animating() && !game.is_garbage_animating() {
+                                    let hard_dropped = input::handle_game_key(other, &mut game, &mut inp, music);
+                                    if hard_dropped {
+                                        process_post_lock(
+                                            &mut game,
+                                            &mut garbage_queue,
+                                            conn,
+                                            music,
+                                        )?;
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
 
-            if game.in_are() {
-                input::update_game_timers(&mut game, &mut inp, music);
-                continue;
-            }
+            if !game.is_animating() && !game.is_garbage_animating() {
+                if game.in_are() {
+                    input::update_game_timers(&mut game, &mut inp, music);
+                    continue;
+                }
 
-            let locked = input::update_game_timers(&mut game, &mut inp, music);
-            if locked {
-                process_post_lock(&mut game, &mut garbage_queue, conn, music)?;
+                let locked = input::update_game_timers(&mut game, &mut inp, music);
+                if locked {
+                    process_post_lock(&mut game, &mut garbage_queue, conn, music)?;
+                }
             }
         }
 
@@ -521,7 +560,6 @@ pub fn run_versus(
                 continue;
             }
             ResultAction::Menu => return Ok(false),
-            ResultAction::Quit => return Ok(true),
         }
     }
 }
@@ -570,7 +608,6 @@ fn apply_pending_garbage(
 enum ResultAction {
     Rematch,
     Menu,
-    Quit,
 }
 
 fn run_result_screen(
@@ -580,7 +617,7 @@ fn run_result_screen(
     won: bool,
 ) -> io::Result<ResultAction> {
     let mut sel: usize = 0;
-    let count: usize = 3;
+    let count: usize = 2;
     let mut _we_requested_rematch = false;
     let mut opponent_requested_rematch = false;
 
@@ -626,7 +663,8 @@ fn run_result_screen(
                                 return Ok(ResultAction::Rematch);
                             }
 
-                            render::versus::draw_versus_waiting_rematch(stdout)?;
+                            render::versus::draw_versus_waiting_rematch(stdout, 0)?;
+                            let mut wait_sel: usize = 0;
                             loop {
                                 match conn.try_recv() {
                                     Ok(Some(NetMessage::RematchRequest)) => {
@@ -648,10 +686,28 @@ fn run_result_screen(
 
                                 if event::poll(Duration::from_millis(50))? {
                                     if let Some(code) = read_key()? {
-                                        if code == KeyCode::Esc || code == KeyCode::Enter {
-                                            play_menu_sfx(music, Sfx::MenuBack);
-                                            let _ = conn.send(&NetMessage::Disconnect);
-                                            return Ok(ResultAction::Menu);
+                                        match code {
+                                            KeyCode::Up | KeyCode::Down => {
+                                                wait_sel = menu_nav(wait_sel, 2, code);
+                                                play_menu_sfx(music, Sfx::MenuMove);
+                                                render::versus::draw_versus_waiting_rematch(stdout, wait_sel)?;
+                                            }
+                                            KeyCode::Enter => match wait_sel {
+                                                0 => {
+                                                    play_menu_sfx(music, Sfx::MenuBack);
+                                                    break;
+                                                }
+                                                _ => {
+                                                    play_menu_sfx(music, Sfx::MenuBack);
+                                                    let _ = conn.send(&NetMessage::Disconnect);
+                                                    return Ok(ResultAction::Menu);
+                                                }
+                                            },
+                                            KeyCode::Esc => {
+                                                play_menu_sfx(music, Sfx::MenuBack);
+                                                break;
+                                            }
+                                            _ => {}
                                         }
                                     }
                                 }
@@ -661,10 +717,6 @@ fn run_result_screen(
                             play_menu_sfx(music, Sfx::MenuBack);
                             let _ = conn.send(&NetMessage::Disconnect);
                             return Ok(ResultAction::Menu);
-                        }
-                        2 => {
-                            let _ = conn.send(&NetMessage::Disconnect);
-                            return Ok(ResultAction::Quit);
                         }
                         _ => {}
                     },

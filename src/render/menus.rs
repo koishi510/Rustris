@@ -66,7 +66,6 @@ pub fn draw_game_over(
     content.push(None);
     content.push(Some(menu_item("Retry", selected == 0, inner_w)));
     content.push(Some(menu_item("Menu", selected == 1, inner_w)));
-    content.push(Some(menu_item("Quit", selected == 2, inner_w)));
     content.push(None);
 
     draw_full_board_overlay(stdout, &content)
@@ -87,7 +86,6 @@ pub fn draw_pause(stdout: &mut io::Stdout, selected: usize) -> io::Result<()> {
         Some(menu_item("Help", selected == 2, inner_w)),
         Some(menu_item("Retry", selected == 3, inner_w)),
         Some(menu_item("Menu", selected == 4, inner_w)),
-        Some(menu_item("Quit", selected == 5, inner_w)),
         None,
     ];
 

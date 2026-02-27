@@ -6,7 +6,7 @@ use crate::game::Game;
 use crate::net::BoardSnapshot;
 use crate::game::piece::*;
 
-use super::{color_for, draw_board_cell, draw_full_board_overlay, draw_piece_preview, draw_right_panel, draw_title, draw_title_padded, left_panel_pad, menu_item, BoardRenderState, LEFT_W};
+use super::{color_for, draw_board_cell, draw_full_board_overlay, draw_piece_preview, draw_right_panel, draw_title, draw_title_padded, left_panel_pad, menu_item, settings_toggle, BoardRenderState, LEFT_W};
 
 pub fn draw_versus(
     stdout: &mut io::Stdout,
@@ -214,14 +214,13 @@ pub fn draw_versus_result(
         None,
         Some(menu_item("Rematch", selected == 0, inner_w)),
         Some(menu_item("Menu", selected == 1, inner_w)),
-        Some(menu_item("Quit", selected == 2, inner_w)),
         None,
     ];
 
     draw_full_board_overlay(stdout, &content)
 }
 
-pub fn draw_versus_waiting_rematch(stdout: &mut io::Stdout) -> io::Result<()> {
+pub fn draw_versus_waiting_rematch(stdout: &mut io::Stdout, selected: usize) -> io::Result<()> {
     execute!(stdout, cursor::MoveTo(0, 0))?;
     draw_title(stdout)?;
 
@@ -232,7 +231,8 @@ pub fn draw_versus_waiting_rematch(stdout: &mut io::Stdout) -> io::Result<()> {
         None,
         Some(format!("{:^width$}", "Waiting...", width = inner_w)),
         None,
-        Some(menu_item("Cancel", true, inner_w)),
+        Some(menu_item("Back", selected == 0, inner_w)),
+        Some(menu_item("Menu", selected == 1, inner_w)),
         None,
     ];
 
@@ -241,6 +241,8 @@ pub fn draw_versus_waiting_rematch(stdout: &mut io::Stdout) -> io::Result<()> {
 
 pub fn draw_versus_forfeit(
     stdout: &mut io::Stdout,
+    bgm_on: bool,
+    sfx_on: bool,
     selected: usize,
 ) -> io::Result<()> {
     execute!(stdout, cursor::MoveTo(0, 0))?;
@@ -252,9 +254,11 @@ pub fn draw_versus_forfeit(
         None,
         Some(format!("{:^width$}", "FORFEIT?", width = inner_w)),
         None,
-        Some(menu_item("Continue", selected == 0, inner_w)),
-        Some(menu_item("Settings", selected == 1, inner_w)),
-        Some(menu_item("Forfeit", selected == 2, inner_w)),
+        Some(settings_toggle("BGM", bgm_on, selected == 0, inner_w)),
+        Some(settings_toggle("SFX", sfx_on, selected == 1, inner_w)),
+        None,
+        Some(menu_item("Continue", selected == 2, inner_w)),
+        Some(menu_item("Forfeit", selected == 3, inner_w)),
         None,
     ];
 

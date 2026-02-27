@@ -32,27 +32,35 @@ fn main() -> io::Result<()> {
                 None => return Ok(()),
             };
             if mode == game::GameMode::Versus {
-                let action = ui::run_versus_menu(&mut stdout, &mut music, &mut settings)?;
-                match action {
-                    ui::VersusAction::Host(port) => {
-                        let lobby = ui::versus::run_host_lobby(&mut stdout, &mut music, port)?;
-                        if let Some((mut conn, vs_settings)) = lobby {
-                            let quit = ui::versus::run_versus(&mut stdout, &mut music, &mut conn, &vs_settings, true)?;
-                            if quit {
-                                return Ok(());
+                'versus: loop {
+                    let action = ui::run_versus_menu(&mut stdout, &mut music, &mut settings)?;
+                    match action {
+                        ui::VersusAction::Host(port) => {
+                            match ui::versus::run_host_lobby(&mut stdout, &mut music, port)? {
+                                ui::versus::LobbyResult::Connected(mut conn, vs_settings) => {
+                                    let quit = ui::versus::run_versus(&mut stdout, &mut music, &mut conn, &vs_settings, true)?;
+                                    if quit {
+                                        return Ok(());
+                                    }
+                                }
+                                ui::versus::LobbyResult::Back => continue 'versus,
+                                ui::versus::LobbyResult::Menu => break 'versus,
                             }
                         }
-                    }
-                    ui::VersusAction::Join(addr) => {
-                        let lobby = ui::versus::run_client_lobby(&mut stdout, &mut music, &addr)?;
-                        if let Some((mut conn, vs_settings)) = lobby {
-                            let quit = ui::versus::run_versus(&mut stdout, &mut music, &mut conn, &vs_settings, false)?;
-                            if quit {
-                                return Ok(());
+                        ui::VersusAction::Join(addr) => {
+                            match ui::versus::run_client_lobby(&mut stdout, &mut music, &addr)? {
+                                ui::versus::LobbyResult::Connected(mut conn, vs_settings) => {
+                                    let quit = ui::versus::run_versus(&mut stdout, &mut music, &mut conn, &vs_settings, false)?;
+                                    if quit {
+                                        return Ok(());
+                                    }
+                                }
+                                ui::versus::LobbyResult::Back => continue 'versus,
+                                ui::versus::LobbyResult::Menu => break 'versus,
                             }
                         }
+                        ui::VersusAction::Back => break 'versus,
                     }
-                    ui::VersusAction::Back => continue,
                 }
                 continue;
             }

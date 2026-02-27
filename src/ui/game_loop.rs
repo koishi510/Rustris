@@ -117,7 +117,7 @@ pub fn run_game(
             };
 
             let mut sel: usize = 0;
-            let count: usize = 3;
+            let count: usize = 2;
             loop {
                 render::draw_game_over(stdout, &game, sel, rank)?;
                 if let Some(code) = read_key()? {
@@ -131,14 +131,10 @@ pub fn run_game(
                                 play_menu_sfx(music, Sfx::MenuSelect);
                                 break;
                             }
-                            1 => {
+                            _ => {
                                 play_menu_sfx(music, Sfx::MenuSelect);
                                 return Ok(false);
                             }
-                            2 => {
-                                return Ok(true);
-                            }
-                            _ => {}
                         },
                         _ => {}
                     }
@@ -192,7 +188,7 @@ pub fn run_game(
                             m.pause();
                         }
                         let mut sel: usize = 0;
-                        let count: usize = 6;
+                        let count: usize = 5;
                         let mut retry = false;
                         loop {
                             render::draw_pause(stdout, sel)?;
@@ -235,12 +231,6 @@ pub fn run_game(
                                                 m.stop();
                                             }
                                             return Ok(false);
-                                        }
-                                        5 => {
-                                            if let Some(m) = music.as_mut() {
-                                                m.stop();
-                                            }
-                                            return Ok(true);
                                         }
                                         _ => {}
                                     },
