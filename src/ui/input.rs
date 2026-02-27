@@ -47,8 +47,8 @@ pub(crate) fn handle_game_key(
     match code {
         KeyCode::Left | KeyCode::Right => {
             let dir = if code == KeyCode::Left { -1 } else { 1 };
-            if input.das.as_ref().is_some_and(|d| d.direction == dir) {
-                input.das.as_mut().unwrap().last_event = Instant::now();
+            if let Some(d) = input.das.as_mut().filter(|d| d.direction == dir) {
+                d.last_event = Instant::now();
             } else {
                 input.das = Some(DasState::new(dir));
                 if !game.in_are() && game.move_piece(0, dir) {

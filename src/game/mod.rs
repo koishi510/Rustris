@@ -152,7 +152,7 @@ impl Game {
                 continue;
             }
             new_board[dest] = self.board[src];
-            dest = dest.wrapping_sub(1);
+            dest = dest.saturating_sub(1);
         }
         self.board = new_board;
     }

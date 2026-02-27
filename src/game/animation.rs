@@ -138,7 +138,9 @@ impl Game {
             }
         }
 
-        self.garbage_rise_anim.as_mut().unwrap().lines_applied = lines_to_apply;
+        if let Some(anim) = self.garbage_rise_anim.as_mut() {
+            anim.lines_applied = lines_to_apply;
+        }
 
         if lines_to_apply >= total_lines {
             self.garbage_rise_anim = None;

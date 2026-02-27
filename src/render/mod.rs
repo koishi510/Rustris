@@ -82,8 +82,10 @@ pub(crate) fn settings_toggle_dim(label: &str, on: bool, inner_w: usize) -> Stri
 pub(crate) fn color_for(id: u8) -> Color {
     if id == GARBAGE_CELL {
         Color::DarkGrey
-    } else {
+    } else if (1..=7).contains(&id) {
         PIECE_COLORS[(id - 1) as usize]
+    } else {
+        Color::White
     }
 }
 
@@ -359,30 +361,28 @@ pub(crate) fn draw_right_panel(stdout: &mut io::Stdout, game: &Game, row: usize)
         8 => match game.mode {
             GameMode::Ultra => write!(stdout, "  LEVEL: {}", game.level)?,
             _ => {
-                if show_action {
-                    let action = game.last_action.as_ref().unwrap();
+                if let Some(action) = show_action.then_some(game.last_action.as_ref()).flatten() {
                     write!(stdout, "  {}", action.label.as_str().with(Color::Yellow))?;
                 }
             }
         },
         9 => match game.mode {
             GameMode::Ultra => {
-                if show_action {
-                    let action = game.last_action.as_ref().unwrap();
+                if let Some(action) = show_action.then_some(game.last_action.as_ref()).flatten() {
                     write!(stdout, "  {}", action.label.as_str().with(Color::Yellow))?;
                 }
             }
             _ => {
-                if show_action {
-                    let action = game.last_action.as_ref().unwrap();
+                if let Some(action) = show_action.then_some(game.last_action.as_ref()).flatten() {
                     write!(stdout, "  {}", format!("+{}", action.points).with(Color::Yellow))?;
                 }
             }
         },
         10 => {
-            if game.mode == GameMode::Ultra && show_action {
-                let action = game.last_action.as_ref().unwrap();
-                write!(stdout, "  {}", format!("+{}", action.points).with(Color::Yellow))?;
+            if let Some(action) = show_action.then_some(game.last_action.as_ref()).flatten() {
+                if game.mode == GameMode::Ultra {
+                    write!(stdout, "  {}", format!("+{}", action.points).with(Color::Yellow))?;
+                }
             }
         }
         _ => {}
