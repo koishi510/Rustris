@@ -8,6 +8,11 @@
 
 A guideline-compliant terminal Tetris with LAN multiplayer support.
 
+<p align="center">
+  <img src="assets/demo_solo.gif" width="49%" alt="Solo gameplay">
+  <img src="assets/demo_pvp.gif" width="49%" alt="Versus gameplay">
+</p>
+
 ## Install
 
 ```sh
@@ -67,8 +72,65 @@ Pending garbage is absorbed when you clear lines (cancel before send). Uncleared
 ### Versus Rules
 
 - Level is fixed (no level-up during a match)
-- Pause is not allowed; Esc opens a Continue/Forfeit menu
+- Game does not pause; Esc opens a non-blocking Forfeit menu (gravity and network continue)
 - No records are saved for Versus games
+
+## Menu Navigation
+
+All menus use **Up/Down** to navigate, **Enter** to select, and **Left/Right** to change mode or toggle values.
+
+```
+Main Menu
+├── < Mode >          ← Left/Right to switch (works on any item)
+├── Start             → Start game
+├── Settings          → Settings (mode-specific + audio)
+├── Records           → Leaderboard (Left/Right to switch mode)
+├── Help              → Controls reference
+└── Quit              → Exit
+
+Versus Menu
+├── Host Game         → Port Input
+│   ├── Confirm       → Host Lobby
+│   ├── Back          → Versus Menu
+│   └── Menu          → Main Menu
+├── Join Game         → IP Input → Port Input
+│   ├── Confirm       → Client Lobby
+│   ├── Back          → Previous step (Port→IP, IP→Versus Menu)
+│   └── Menu          → Main Menu
+└── Back              → Main Menu
+
+Host Lobby (waiting for connection)
+├── Back              → Versus Menu
+└── Menu              → Main Menu
+
+Client Lobby (connection failed)
+├── Retry             → Retry connection
+├── Back              → Versus Menu
+└── Menu              → Main Menu
+
+Pause (single-player, Esc/P to open)
+├── Resume            → Resume game (Esc also resumes)
+├── Settings          → BGM/SFX toggles
+├── Help              → Controls reference
+├── Retry             → Restart game
+└── Menu              → Main Menu
+
+Game Over (single-player)
+├── Retry             → Restart game
+└── Menu              → Main Menu
+
+Forfeit (versus, Esc to open, non-blocking)
+├── BGM               ← Left/Right/Enter to toggle
+├── SFX               ← Left/Right/Enter to toggle
+├── Continue          → Resume (Esc also resumes)
+└── Forfeit           → Lose and end match
+
+Versus Result
+├── Rematch           → Request rematch (waiting screen)
+│   ├── Back          → Result screen
+│   └── Menu          → Disconnect, Main Menu
+└── Menu              → Disconnect, Main Menu
+```
 
 ## Controls
 
