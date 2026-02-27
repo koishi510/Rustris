@@ -10,6 +10,14 @@ pub enum GameMode {
 }
 
 impl GameMode {
+    pub fn setting_count(self) -> usize {
+        match self {
+            Self::Marathon => 3,
+            Self::Endless => 2,
+            Self::Sprint | Self::Ultra | Self::Versus => 1,
+        }
+    }
+
     pub fn next(self) -> Self {
         match self {
             Self::Marathon => Self::Sprint,
@@ -47,6 +55,13 @@ impl LineClearAnimation {
             started_at: Instant::now(),
             phase: 0,
         }
+    }
+}
+
+pub fn format_option_or_inf(val: Option<u32>) -> String {
+    match val {
+        Some(n) => n.to_string(),
+        None => "INF".to_string(),
     }
 }
 

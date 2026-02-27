@@ -5,4 +5,4 @@ mod session;
 mod versus;
 
 pub use app::run_app;
-pub(crate) use input::{menu_nav, play_menu_sfx, read_key};
+pub(crate) use input::{menu_nav, play_menu_sfx, read_key, toggle_bgm, toggle_sfx};

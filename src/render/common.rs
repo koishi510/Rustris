@@ -72,6 +72,28 @@ pub(crate) fn settings_toggle_dim(label: &str, on: bool, inner_w: usize) -> Stri
     centered_line(&formatted, false, inner_w, true)
 }
 
+pub(crate) fn draw_board_top(stdout: &mut io::Stdout) -> io::Result<()> {
+    write!(stdout, "{:LEFT_W$}╔", "")?;
+    for _ in 0..BOARD_WIDTH {
+        write!(stdout, "══")?;
+    }
+    write!(stdout, "╗\x1b[K\r\n")
+}
+
+pub(crate) fn draw_board_bottom(stdout: &mut io::Stdout) -> io::Result<()> {
+    write!(stdout, "{:LEFT_W$}╚", "")?;
+    for _ in 0..BOARD_WIDTH {
+        write!(stdout, "══")?;
+    }
+    write!(stdout, "╝\x1b[K\r\n")
+}
+
+pub(crate) fn format_time(d: Duration) -> String {
+    let secs = d.as_secs();
+    let centis = d.subsec_millis() / 10;
+    format!("{}:{:02}.{:02}", secs / 60, secs % 60, centis)
+}
+
 pub(crate) fn color_for(id: u8) -> Color {
     if id == GARBAGE_CELL {
         Color::DarkGrey
@@ -278,11 +300,7 @@ pub(crate) fn draw_full_board_overlay(
     let inner_w = BOARD_WIDTH * 2;
     let start_row = (VISIBLE_HEIGHT - content.len()) / 2;
 
-    write!(stdout, "{:LEFT_W$}╔", "")?;
-    for _ in 0..BOARD_WIDTH {
-        write!(stdout, "══")?;
-    }
-    write!(stdout, "╗\x1b[K\r\n")?;
+    draw_board_top(stdout)?;
 
     for row in 0..VISIBLE_HEIGHT {
         write!(stdout, "{:LEFT_W$}║", "")?;
@@ -297,11 +315,7 @@ pub(crate) fn draw_full_board_overlay(
         write!(stdout, "║\x1b[K\r\n")?;
     }
 
-    write!(stdout, "{:LEFT_W$}╚", "")?;
-    for _ in 0..BOARD_WIDTH {
-        write!(stdout, "══")?;
-    }
-    write!(stdout, "╝\x1b[K\r\n")?;
+    draw_board_bottom(stdout)?;
 
     write!(stdout, "\x1b[J")?;
     stdout.flush()?;
@@ -329,15 +343,11 @@ pub(crate) fn draw_right_panel(stdout: &mut io::Stdout, game: &Game, row: usize)
         5 => match game.mode {
             GameMode::Marathon | GameMode::Endless | GameMode::Versus => write!(stdout, "  SCORE: {}", game.score)?,
             GameMode::Sprint => {
-                let secs = game.elapsed.as_secs();
-                let centis = game.elapsed.subsec_millis() / 10;
-                write!(stdout, "  TIME: {}:{:02}.{:02}", secs / 60, secs % 60, centis)?;
+                write!(stdout, "  TIME: {}", format_time(game.elapsed))?;
             }
             GameMode::Ultra => {
                 if let Some(rem) = game.time_remaining() {
-                    let secs = rem.as_secs();
-                    let centis = rem.subsec_millis() / 10;
-                    write!(stdout, "  TIME: {}:{:02}.{:02}", secs / 60, secs % 60, centis)?;
+                    write!(stdout, "  TIME: {}", format_time(rem))?;
                 }
             }
         },

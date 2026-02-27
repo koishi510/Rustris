@@ -13,7 +13,7 @@ use crate::render;
 use crate::game::settings::Settings;
 
 use super::input::{self, InputState};
-use super::{menu_nav, play_menu_sfx, read_key};
+use super::{menu_nav, play_menu_sfx, read_key, toggle_bgm, toggle_sfx};
 
 const BOARD_SYNC_INTERVAL: Duration = Duration::from_millis(66);
 
@@ -23,36 +23,53 @@ pub enum LobbyResult {
     Menu,
 }
 
+fn check_version(msg: NetMessage) -> io::Result<()> {
+    match msg {
+        NetMessage::Hello { version } if version == PROTOCOL_VERSION => Ok(()),
+        NetMessage::Hello { version } => Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("protocol version mismatch: local={}, remote={}", PROTOCOL_VERSION, version),
+        )),
+        _ => Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "expected Hello",
+        )),
+    }
+}
+
 fn perform_handshake(conn: &mut Connection, is_host: bool) -> io::Result<()> {
     if is_host {
         conn.send(&NetMessage::Hello { version: PROTOCOL_VERSION })?;
-        let msg = conn.recv_blocking()?;
-        match msg {
-            NetMessage::Hello { version } if version == PROTOCOL_VERSION => Ok(()),
-            NetMessage::Hello { version } => Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("protocol version mismatch: local={}, remote={}", PROTOCOL_VERSION, version),
-            )),
-            _ => Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "expected Hello",
-            )),
-        }
+        check_version(conn.recv_blocking()?)
     } else {
-        let msg = conn.recv_blocking()?;
-        match msg {
-            NetMessage::Hello { version } if version == PROTOCOL_VERSION => {
-                conn.send(&NetMessage::Hello { version: PROTOCOL_VERSION })?;
-                Ok(())
+        check_version(conn.recv_blocking()?)?;
+        conn.send(&NetMessage::Hello { version: PROTOCOL_VERSION })
+    }
+}
+
+fn show_handshake_error(
+    stdout: &mut io::Stdout,
+    music: &mut Option<audio::MusicPlayer>,
+    title: &str,
+    error_msg: &str,
+) -> io::Result<LobbyResult> {
+    let mut sel: usize = 0;
+    loop {
+        render::versus::draw_lobby_screen(
+            stdout, title, &["Handshake failed"], error_msg, &["Back"], sel,
+        )?;
+        if let Some(code) = read_key()? {
+            match code {
+                KeyCode::Up | KeyCode::Down => {
+                    sel = menu_nav(sel, 1, code);
+                    play_menu_sfx(music, Sfx::MenuMove);
+                }
+                KeyCode::Enter | KeyCode::Esc => {
+                    play_menu_sfx(music, Sfx::MenuBack);
+                    return Ok(LobbyResult::Back);
+                }
+                _ => {}
             }
-            NetMessage::Hello { version } => Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("protocol version mismatch: local={}, remote={}", PROTOCOL_VERSION, version),
-            )),
-            _ => Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "expected Hello",
-            )),
         }
     }
 }
@@ -105,27 +122,7 @@ pub fn run_host_lobby(
                 )?;
 
                 if let Err(e) = perform_handshake(&mut conn, true) {
-                    let error_msg = format!("{}", e);
-                    let mut sel: usize = 0;
-                    let count: usize = 1;
-                    loop {
-                        render::versus::draw_lobby_screen(
-                            stdout, "HOST GAME", &["Handshake failed"], &error_msg, &["Back"], sel,
-                        )?;
-                        if let Some(code) = read_key()? {
-                            match code {
-                                KeyCode::Up | KeyCode::Down => {
-                                    sel = menu_nav(sel, count, code);
-                                    play_menu_sfx(music, Sfx::MenuMove);
-                                }
-                                KeyCode::Enter | KeyCode::Esc => {
-                                    play_menu_sfx(music, Sfx::MenuBack);
-                                    return Ok(LobbyResult::Back);
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
+                    return show_handshake_error(stdout, music, "HOST GAME", &format!("{}", e));
                 }
 
                 let vs = Settings::default();
@@ -214,27 +211,7 @@ pub fn run_client_lobby(
     )?;
 
     if let Err(e) = perform_handshake(&mut conn, false) {
-        let error_msg = format!("{}", e);
-        let mut sel: usize = 0;
-        let count: usize = 1;
-        loop {
-            render::versus::draw_lobby_screen(
-                stdout, "JOIN GAME", &["Handshake failed"], &error_msg, &["Back"], sel,
-            )?;
-            if let Some(code) = read_key()? {
-                match code {
-                    KeyCode::Up | KeyCode::Down => {
-                        sel = menu_nav(sel, count, code);
-                        play_menu_sfx(music, Sfx::MenuMove);
-                    }
-                    KeyCode::Enter | KeyCode::Esc => {
-                        play_menu_sfx(music, Sfx::MenuBack);
-                        return Ok(LobbyResult::Back);
-                    }
-                    _ => {}
-                }
-            }
-        }
+        return show_handshake_error(stdout, music, "JOIN GAME", &format!("{}", e));
     }
 
     let msg = conn.recv_blocking()?;
@@ -429,33 +406,13 @@ pub fn run_versus(
                                 play_menu_sfx(music, Sfx::MenuMove);
                             }
                             KeyCode::Left | KeyCode::Right => match *sel {
-                                0 => {
-                                    if let Some(m) = music.as_mut() {
-                                        m.toggle_bgm();
-                                        m.play_sfx(Sfx::MenuMove);
-                                    }
-                                }
-                                1 => {
-                                    if let Some(m) = music.as_mut() {
-                                        m.toggle_sfx();
-                                        m.play_sfx(Sfx::MenuMove);
-                                    }
-                                }
+                                0 => toggle_bgm(music),
+                                1 => toggle_sfx(music),
                                 _ => {}
                             }
                             KeyCode::Enter => match *sel {
-                                0 => {
-                                    if let Some(m) = music.as_mut() {
-                                        m.toggle_bgm();
-                                        m.play_sfx(Sfx::MenuMove);
-                                    }
-                                }
-                                1 => {
-                                    if let Some(m) = music.as_mut() {
-                                        m.toggle_sfx();
-                                        m.play_sfx(Sfx::MenuMove);
-                                    }
-                                }
+                                0 => toggle_bgm(music),
+                                1 => toggle_sfx(music),
                                 2 => {
                                     if let Some(m) = music.as_ref() {
                                         m.play_sfx(Sfx::Resume);

@@ -57,34 +57,22 @@ impl Records {
             GameMode::Versus => return None,
         };
 
-        match mode {
+        let pos = match mode {
             GameMode::Sprint => {
                 let time = record.time?;
-                let pos = list
-                    .iter()
-                    .position(|r| r.time.is_none_or(|t| time < t))
-                    .unwrap_or(list.len());
-                if pos >= 10 {
-                    return None;
-                }
-                list.insert(pos, record);
-                list.truncate(10);
-                Some(pos)
+                list.iter().position(|r| r.time.is_none_or(|t| time < t))
             }
-            GameMode::Marathon | GameMode::Ultra | GameMode::Endless => {
+            _ => {
                 let score = record.score;
-                let pos = list
-                    .iter()
-                    .position(|r| score > r.score)
-                    .unwrap_or(list.len());
-                if pos >= 10 {
-                    return None;
-                }
-                list.insert(pos, record);
-                list.truncate(10);
-                Some(pos)
+                list.iter().position(|r| score > r.score)
             }
-            GameMode::Versus => unreachable!(),
+        };
+        let pos = pos.unwrap_or(list.len());
+        if pos >= 10 {
+            return None;
         }
+        list.insert(pos, record);
+        list.truncate(10);
+        Some(pos)
     }
 }

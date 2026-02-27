@@ -337,6 +337,20 @@ pub(crate) fn play_menu_sfx(music: &Option<audio::MusicPlayer>, sfx: Sfx) {
     }
 }
 
+pub(crate) fn toggle_bgm(music: &mut Option<audio::MusicPlayer>) {
+    if let Some(m) = music.as_mut() {
+        m.toggle_bgm();
+        m.play_sfx(Sfx::MenuMove);
+    }
+}
+
+pub(crate) fn toggle_sfx(music: &mut Option<audio::MusicPlayer>) {
+    if let Some(m) = music.as_mut() {
+        m.toggle_sfx();
+        m.play_sfx(Sfx::MenuMove);
+    }
+}
+
 pub(crate) fn menu_nav(sel: usize, count: usize, code: KeyCode) -> usize {
     match code {
         KeyCode::Up => sel.checked_sub(1).unwrap_or(count - 1),

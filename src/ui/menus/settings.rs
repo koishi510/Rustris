@@ -6,7 +6,7 @@ use crate::game::GameMode;
 use crate::game::piece::MAX_NEXT_COUNT;
 use crate::render;
 use crate::game::settings::Settings;
-use crate::ui::{menu_nav, play_menu_sfx, read_key};
+use crate::ui::{menu_nav, play_menu_sfx, read_key, toggle_bgm, toggle_sfx};
 
 fn adjust_level_cap(settings: &mut Settings, direction: i32) {
     match (settings.level_cap, direction) {
@@ -19,11 +19,7 @@ fn adjust_level_cap(settings: &mut Settings, direction: i32) {
 }
 
 fn adjust_setting(settings: &mut Settings, sel: usize, direction: i32, mode: GameMode) {
-    let mc: usize = match mode {
-        GameMode::Marathon => 3,
-        GameMode::Endless => 2,
-        GameMode::Sprint | GameMode::Ultra | GameMode::Versus => 1,
-    };
+    let mc = mode.setting_count();
 
     if sel < mc {
         match mode {
@@ -116,33 +112,13 @@ pub(crate) fn run_settings(
                         play_menu_sfx(music, Sfx::MenuMove);
                     }
                     KeyCode::Left | KeyCode::Right => match sel {
-                        0 => {
-                            if let Some(m) = music.as_mut() {
-                                m.toggle_bgm();
-                                m.play_sfx(Sfx::MenuMove);
-                            }
-                        }
-                        1 => {
-                            if let Some(m) = music.as_mut() {
-                                m.toggle_sfx();
-                                m.play_sfx(Sfx::MenuMove);
-                            }
-                        }
+                        0 => toggle_bgm(music),
+                        1 => toggle_sfx(music),
                         _ => {}
                     },
                     KeyCode::Enter => match sel {
-                        0 => {
-                            if let Some(m) = music.as_mut() {
-                                m.toggle_bgm();
-                                m.play_sfx(Sfx::MenuMove);
-                            }
-                        }
-                        1 => {
-                            if let Some(m) = music.as_mut() {
-                                m.toggle_sfx();
-                                m.play_sfx(Sfx::MenuMove);
-                            }
-                        }
+                        0 => toggle_bgm(music),
+                        1 => toggle_sfx(music),
                         2 => {
                             play_menu_sfx(music, Sfx::MenuBack);
                             return Ok(());
@@ -159,11 +135,7 @@ pub(crate) fn run_settings(
         }
     }
 
-    let mc: usize = match mode {
-        GameMode::Marathon => 3,
-        GameMode::Endless => 2,
-        GameMode::Sprint | GameMode::Ultra | GameMode::Versus => 1,
-    };
+    let mc = mode.setting_count();
     let count = mc + 11;
     let idx_bgm = mc + 8;
     let idx_sfx = mc + 9;
@@ -191,15 +163,9 @@ pub(crate) fn run_settings(
                         adjust_setting(settings, sel, dir, mode);
                         play_menu_sfx(music, Sfx::MenuMove);
                     } else if sel == idx_bgm {
-                        if let Some(m) = music.as_mut() {
-                            m.toggle_bgm();
-                            m.play_sfx(Sfx::MenuMove);
-                        }
+                        toggle_bgm(music);
                     } else if sel == idx_sfx {
-                        if let Some(m) = music.as_mut() {
-                            m.toggle_sfx();
-                            m.play_sfx(Sfx::MenuMove);
-                        }
+                        toggle_sfx(music);
                     }
                 }
                 KeyCode::Enter => {
@@ -207,15 +173,9 @@ pub(crate) fn run_settings(
                         adjust_setting(settings, sel, 0, mode);
                         play_menu_sfx(music, Sfx::MenuMove);
                     } else if sel == idx_bgm {
-                        if let Some(m) = music.as_mut() {
-                            m.toggle_bgm();
-                            m.play_sfx(Sfx::MenuMove);
-                        }
+                        toggle_bgm(music);
                     } else if sel == idx_sfx {
-                        if let Some(m) = music.as_mut() {
-                            m.toggle_sfx();
-                            m.play_sfx(Sfx::MenuMove);
-                        }
+                        toggle_sfx(music);
                     } else if sel == idx_back {
                         play_menu_sfx(music, Sfx::MenuBack);
                         return Ok(());

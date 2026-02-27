@@ -2,14 +2,14 @@ use crossterm::{cursor, execute, style::{Color, Stylize}};
 use std::io::{self, Write};
 use std::time::Duration;
 
-use crate::game::{Game, GameMode};
+use crate::game::{Game, GameMode, format_option_or_inf};
 use crate::game::piece::*;
 use crate::game::records::Records;
 use crate::game::settings::Settings;
 
 use super::{
-    draw_full_board_overlay, draw_title, menu_item, settings_toggle, settings_toggle_dim,
-    settings_value, settings_value_dim, LEFT_W,
+    draw_board_bottom, draw_board_top, draw_full_board_overlay, draw_title, format_time,
+    menu_item, settings_toggle, settings_toggle_dim, settings_value, settings_value_dim, LEFT_W,
 };
 
 pub fn draw_game_over(
@@ -49,10 +49,8 @@ pub fn draw_game_over(
     ];
 
     if game.mode == GameMode::Sprint && game.cleared {
-        let secs = game.elapsed.as_secs();
-        let centis = game.elapsed.subsec_millis() / 10;
         content.push(Some(format!("{:>9}: {:<9}",
-            "TIME", format!("{}:{:02}.{:02}", secs / 60, secs % 60, centis)
+            "TIME", format_time(game.elapsed)
         )));
     }
     content.push(Some(format!("{:>9}: {:<9}", "SCORE", game.score)));
@@ -151,11 +149,7 @@ pub fn draw_help(stdout: &mut io::Stdout, selected: usize) -> io::Result<()> {
 
     let start_row = (VISIBLE_HEIGHT - content.len()) / 2;
 
-    write!(stdout, "{:LEFT_W$}╔", "")?;
-    for _ in 0..BOARD_WIDTH {
-        write!(stdout, "══")?;
-    }
-    write!(stdout, "╗\x1b[K\r\n")?;
+    draw_board_top(stdout)?;
 
     for row in 0..VISIBLE_HEIGHT {
         write!(stdout, "{:LEFT_W$}║", "")?;
@@ -170,11 +164,7 @@ pub fn draw_help(stdout: &mut io::Stdout, selected: usize) -> io::Result<()> {
         write!(stdout, "║\x1b[K\r\n")?;
     }
 
-    write!(stdout, "{:LEFT_W$}╚", "")?;
-    for _ in 0..BOARD_WIDTH {
-        write!(stdout, "══")?;
-    }
-    write!(stdout, "╝\x1b[K\r\n")?;
+    draw_board_bottom(stdout)?;
 
     write!(stdout, "\x1b[J")?;
     stdout.flush()?;
@@ -194,10 +184,21 @@ pub fn draw_settings(
     draw_title(stdout)?;
 
     let inner_w = BOARD_WIDTH * 2;
-    let mc: usize = match mode {
-        GameMode::Marathon => 3,
-        GameMode::Endless => 2,
-        GameMode::Sprint | GameMode::Ultra | GameMode::Versus => 1,
+    let mc = mode.setting_count();
+
+    let sv = |label: &str, value: &str, idx: usize| {
+        if in_game {
+            settings_value_dim(label, value, inner_w)
+        } else {
+            settings_value(label, value, selected == idx, inner_w)
+        }
+    };
+    let st = |label: &str, on: bool, idx: usize| {
+        if in_game {
+            settings_toggle_dim(label, on, inner_w)
+        } else {
+            settings_toggle(label, on, selected == idx, inner_w)
+        }
     };
 
     let mut content: Vec<Option<String>> = vec![
@@ -205,99 +206,45 @@ pub fn draw_settings(
         None,
     ];
 
-    if in_game {
-        match mode {
-            GameMode::Marathon => {
-                content.push(Some(settings_value_dim("Level", &settings.level.to_string(), inner_w)));
-                content.push(Some(settings_value_dim("Goal", &settings.marathon_goal.to_string(), inner_w)));
-                let cap_str = match settings.level_cap {
-                    Some(c) => c.to_string(),
-                    None => "INF".to_string(),
-                };
-                content.push(Some(settings_value_dim("Cap", &cap_str, inner_w)));
-            }
-            GameMode::Endless => {
-                content.push(Some(settings_value_dim("Level", &settings.level.to_string(), inner_w)));
-                let cap_str = match settings.level_cap {
-                    Some(c) => c.to_string(),
-                    None => "INF".to_string(),
-                };
-                content.push(Some(settings_value_dim("Cap", &cap_str, inner_w)));
-            }
-            GameMode::Sprint => {
-                content.push(Some(settings_value_dim("Goal", &settings.sprint_goal.to_string(), inner_w)));
-            }
-            GameMode::Ultra => {
-                let time_str = format!("{}s", settings.ultra_time);
-                content.push(Some(settings_value_dim("Time", &time_str, inner_w)));
-            }
-            GameMode::Versus => {
-                content.push(Some(settings_value_dim("Level", &settings.level.to_string(), inner_w)));
-            }
+    match mode {
+        GameMode::Marathon => {
+            content.push(Some(sv("Level", &settings.level.to_string(), 0)));
+            content.push(Some(sv("Goal", &settings.marathon_goal.to_string(), 1)));
+            content.push(Some(sv("Cap", &format_option_or_inf(settings.level_cap), 2)));
         }
-        content.push(Some(settings_value_dim("Next", &settings.next_count.to_string(), inner_w)));
-        let lock_str = format!("{:.1}s", settings.lock_delay_ms as f32 / 1000.0);
-        content.push(Some(settings_value_dim("Lock", &lock_str, inner_w)));
-        let reset_str = match settings.move_reset {
-            Some(n) => n.to_string(),
-            None => "INF".to_string(),
-        };
-        content.push(Some(settings_value_dim("Reset", &reset_str, inner_w)));
-        content.push(Some(settings_toggle_dim("Ghost", settings.ghost, inner_w)));
-        content.push(Some(settings_toggle_dim("Anim", settings.line_clear_anim, inner_w)));
-        content.push(Some(settings_toggle_dim("Bag", settings.bag_randomizer, inner_w)));
-        content.push(Some(settings_toggle_dim("SRS", settings.srs_enabled, inner_w)));
-        content.push(Some(settings_toggle_dim("Hold", settings.hold_enabled, inner_w)));
-        content.push(None);
+        GameMode::Endless => {
+            content.push(Some(sv("Level", &settings.level.to_string(), 0)));
+            content.push(Some(sv("Cap", &format_option_or_inf(settings.level_cap), 1)));
+        }
+        GameMode::Sprint => {
+            content.push(Some(sv("Goal", &settings.sprint_goal.to_string(), 0)));
+        }
+        GameMode::Ultra => {
+            let time_str = format!("{}s", settings.ultra_time);
+            content.push(Some(sv("Time", &time_str, 0)));
+        }
+        GameMode::Versus => {
+            content.push(Some(sv("Level", &settings.level.to_string(), 0)));
+        }
+    }
+
+    content.push(Some(sv("Next", &settings.next_count.to_string(), mc)));
+    let lock_str = format!("{:.1}s", settings.lock_delay_ms as f32 / 1000.0);
+    content.push(Some(sv("Lock", &lock_str, mc + 1)));
+    content.push(Some(sv("Reset", &format_option_or_inf(settings.move_reset), mc + 2)));
+    content.push(Some(st("Ghost", settings.ghost, mc + 3)));
+    content.push(Some(st("Anim", settings.line_clear_anim, mc + 4)));
+    content.push(Some(st("Bag", settings.bag_randomizer, mc + 5)));
+    content.push(Some(st("SRS", settings.srs_enabled, mc + 6)));
+    content.push(Some(st("Hold", settings.hold_enabled, mc + 7)));
+    content.push(None);
+
+    if in_game {
         content.push(Some(settings_toggle("BGM", bgm_on, selected == 0, inner_w)));
         content.push(Some(settings_toggle("SFX", sfx_on, selected == 1, inner_w)));
         content.push(None);
         content.push(Some(menu_item("Back", selected == 2, inner_w)));
     } else {
-        match mode {
-            GameMode::Marathon => {
-                content.push(Some(settings_value("Level", &settings.level.to_string(), selected == 0, inner_w)));
-                content.push(Some(settings_value("Goal", &settings.marathon_goal.to_string(), selected == 1, inner_w)));
-                let cap_str = match settings.level_cap {
-                    Some(c) => c.to_string(),
-                    None => "INF".to_string(),
-                };
-                content.push(Some(settings_value("Cap", &cap_str, selected == 2, inner_w)));
-            }
-            GameMode::Endless => {
-                content.push(Some(settings_value("Level", &settings.level.to_string(), selected == 0, inner_w)));
-                let cap_str = match settings.level_cap {
-                    Some(c) => c.to_string(),
-                    None => "INF".to_string(),
-                };
-                content.push(Some(settings_value("Cap", &cap_str, selected == 1, inner_w)));
-            }
-            GameMode::Sprint => {
-                content.push(Some(settings_value("Goal", &settings.sprint_goal.to_string(), selected == 0, inner_w)));
-            }
-            GameMode::Ultra => {
-                let time_str = format!("{}s", settings.ultra_time);
-                content.push(Some(settings_value("Time", &time_str, selected == 0, inner_w)));
-            }
-            GameMode::Versus => {
-                content.push(Some(settings_value("Level", &settings.level.to_string(), selected == 0, inner_w)));
-            }
-        }
-
-        content.push(Some(settings_value("Next", &settings.next_count.to_string(), selected == mc, inner_w)));
-        let lock_str = format!("{:.1}s", settings.lock_delay_ms as f32 / 1000.0);
-        content.push(Some(settings_value("Lock", &lock_str, selected == mc + 1, inner_w)));
-        let reset_str = match settings.move_reset {
-            Some(n) => n.to_string(),
-            None => "INF".to_string(),
-        };
-        content.push(Some(settings_value("Reset", &reset_str, selected == mc + 2, inner_w)));
-        content.push(Some(settings_toggle("Ghost", settings.ghost, selected == mc + 3, inner_w)));
-        content.push(Some(settings_toggle("Anim", settings.line_clear_anim, selected == mc + 4, inner_w)));
-        content.push(Some(settings_toggle("Bag", settings.bag_randomizer, selected == mc + 5, inner_w)));
-        content.push(Some(settings_toggle("SRS", settings.srs_enabled, selected == mc + 6, inner_w)));
-        content.push(Some(settings_toggle("Hold", settings.hold_enabled, selected == mc + 7, inner_w)));
-        content.push(None);
         content.push(Some(settings_toggle("BGM", bgm_on, selected == mc + 8, inner_w)));
         content.push(Some(settings_toggle("SFX", sfx_on, selected == mc + 9, inner_w)));
         content.push(None);

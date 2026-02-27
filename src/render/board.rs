@@ -4,7 +4,7 @@ use std::io::{self, Write};
 use crate::game::Game;
 use crate::game::piece::*;
 
-use super::{draw_piece_preview, draw_right_panel, draw_title, left_panel_pad, BoardRenderState, draw_board_cell, LEFT_W};
+use super::{draw_board_bottom, draw_board_top, draw_piece_preview, draw_right_panel, draw_title, left_panel_pad, BoardRenderState, draw_board_cell, LEFT_W};
 
 pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
     execute!(stdout, cursor::MoveTo(0, 0))?;
@@ -12,11 +12,7 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
 
     let state = BoardRenderState::from_game(game);
 
-    write!(stdout, "{:LEFT_W$}╔", "")?;
-    for _ in 0..BOARD_WIDTH {
-        write!(stdout, "══")?;
-    }
-    write!(stdout, "╗\x1b[K\r\n")?;
+    draw_board_top(stdout)?;
 
     for row in 0..VISIBLE_HEIGHT {
         let board_row = row + BUFFER_HEIGHT;
@@ -54,11 +50,7 @@ pub fn draw(stdout: &mut io::Stdout, game: &Game) -> io::Result<()> {
         write!(stdout, "\x1b[K\r\n")?;
     }
 
-    write!(stdout, "{:LEFT_W$}╚", "")?;
-    for _ in 0..BOARD_WIDTH {
-        write!(stdout, "══")?;
-    }
-    write!(stdout, "╝\x1b[K\r\n")?;
+    draw_board_bottom(stdout)?;
 
     write!(stdout, "\x1b[J")?;
 
