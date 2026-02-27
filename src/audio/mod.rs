@@ -86,7 +86,8 @@ impl PolySource {
         let samples_per_beat = BEAT_DURATION * SAMPLE_RATE as f32;
         let total_samples = (TOTAL_BEATS * samples_per_beat) as u64;
 
-        let notes: Vec<SampleNote> = NOTES
+        let raw_notes = build_notes();
+        let notes: Vec<SampleNote> = raw_notes
             .iter()
             .map(|&(start_beat, dur_beats, freq)| {
                 let start = (start_beat * samples_per_beat) as u64;
