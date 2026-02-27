@@ -25,16 +25,19 @@ impl GarbageQueue {
     }
 
     pub fn cancel(&mut self, mut attack: u32) -> u32 {
-        while attack > 0 && !self.pending.is_empty() {
-            let front = &mut self.pending[0];
-            if attack >= front.lines {
-                attack -= front.lines;
-                self.pending.remove(0);
-            } else {
-                front.lines -= attack;
-                attack = 0;
+        self.pending.retain_mut(|event| {
+            if attack == 0 {
+                return true;
             }
-        }
+            if attack >= event.lines {
+                attack -= event.lines;
+                false
+            } else {
+                event.lines -= attack;
+                attack = 0;
+                true
+            }
+        });
         attack
     }
 

@@ -122,7 +122,7 @@ impl BoardRenderState {
             if game.ghost_enabled {
                 let ghost_row = game.ghost_row();
                 ghost_cells = {
-                    let mut g = game.current.clone();
+                    let mut g = game.current;
                     g.row = ghost_row;
                     g.cells()
                 };

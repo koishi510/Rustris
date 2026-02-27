@@ -8,6 +8,16 @@ use crate::render;
 use crate::game::settings::Settings;
 use crate::ui::{menu_nav, play_menu_sfx, read_key};
 
+fn adjust_level_cap(settings: &mut Settings, direction: i32) {
+    match (settings.level_cap, direction) {
+        (Some(c), 1) if c >= 20 => settings.level_cap = None,
+        (Some(c), 1) => settings.level_cap = Some((c + 1).min(20)),
+        (Some(c), -1) => settings.level_cap = Some(if c <= 1 { 1 } else { c - 1 }),
+        (None, -1) => settings.level_cap = Some(20),
+        _ => {}
+    }
+}
+
 fn adjust_setting(settings: &mut Settings, sel: usize, direction: i32, mode: GameMode) {
     let mc: usize = match mode {
         GameMode::Marathon => 3,
@@ -27,13 +37,7 @@ fn adjust_setting(settings: &mut Settings, sel: usize, direction: i32, mode: Gam
                     settings.marathon_goal = v.clamp(10, 300) as u32;
                 }
                 2 => {
-                    match (settings.level_cap, direction) {
-                        (Some(c), 1) if c >= 20 => settings.level_cap = None,
-                        (Some(c), 1) => settings.level_cap = Some((c + 1).min(20)),
-                        (Some(c), -1) => settings.level_cap = Some(if c <= 1 { 1 } else { c - 1 }),
-                        (None, -1) => settings.level_cap = Some(20),
-                        _ => {}
-                    }
+                    adjust_level_cap(settings, direction);
                 }
                 _ => {}
             },
@@ -43,13 +47,7 @@ fn adjust_setting(settings: &mut Settings, sel: usize, direction: i32, mode: Gam
                     settings.level = v.clamp(1, 20) as u32;
                 }
                 1 => {
-                    match (settings.level_cap, direction) {
-                        (Some(c), 1) if c >= 20 => settings.level_cap = None,
-                        (Some(c), 1) => settings.level_cap = Some((c + 1).min(20)),
-                        (Some(c), -1) => settings.level_cap = Some(if c <= 1 { 1 } else { c - 1 }),
-                        (None, -1) => settings.level_cap = Some(20),
-                        _ => {}
-                    }
+                    adjust_level_cap(settings, direction);
                 }
                 _ => {}
             },

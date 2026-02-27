@@ -462,10 +462,7 @@ pub fn run_versus(
                                     forfeit_sel = None;
                                     inp.last_tick = Instant::now();
                                     if let Some(d) = &mut inp.das {
-                                        let now = Instant::now();
-                                        d.last_event = now;
-                                        d.start = now;
-                                        d.last_arr_move = now;
+                                        d.reset_timers();
                                     }
                                     execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
                                 }
@@ -482,10 +479,7 @@ pub fn run_versus(
                                 forfeit_sel = None;
                                 inp.last_tick = Instant::now();
                                 if let Some(d) = &mut inp.das {
-                                    let now = Instant::now();
-                                    d.last_event = now;
-                                    d.start = now;
-                                    d.last_arr_move = now;
+                                    d.reset_timers();
                                 }
                                 execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
                             }
@@ -619,7 +613,7 @@ fn run_result_screen(
 ) -> io::Result<ResultAction> {
     let mut sel: usize = 0;
     let count: usize = 2;
-    let mut _we_requested_rematch = false;
+    let mut we_requested_rematch = false;
     let mut opponent_requested_rematch = false;
 
     loop {
@@ -628,7 +622,7 @@ fn run_result_screen(
         match conn.try_recv() {
             Ok(Some(NetMessage::RematchRequest)) => {
                 opponent_requested_rematch = true;
-                if _we_requested_rematch {
+                if we_requested_rematch {
                     let _ = conn.send(&NetMessage::RematchAccept);
                     return Ok(ResultAction::Rematch);
                 }
@@ -657,7 +651,7 @@ fn run_result_screen(
                         0 => {
                             play_menu_sfx(music, Sfx::MenuSelect);
                             let _ = conn.send(&NetMessage::RematchRequest);
-                            _we_requested_rematch = true;
+                            we_requested_rematch = true;
 
                             if opponent_requested_rematch {
                                 let _ = conn.send(&NetMessage::RematchAccept);

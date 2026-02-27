@@ -19,7 +19,7 @@ impl Game {
     }
 
     pub fn move_piece(&mut self, dr: i32, dc: i32) -> bool {
-        let mut moved = self.current.clone();
+        let mut moved = self.current;
         moved.row += dr;
         moved.col += dc;
         if self.fits(&moved) {
@@ -49,7 +49,7 @@ impl Game {
             let kicks = &kick_table[idx];
 
             for &[dc, dr] in kicks {
-                let mut test = self.current.clone();
+                let mut test = self.current;
                 test.rotation = to;
                 test.col += dc;
                 test.row += dr;
@@ -61,7 +61,7 @@ impl Game {
                 }
             }
         } else {
-            let mut test = self.current.clone();
+            let mut test = self.current;
             test.rotation = new_rotation;
             if self.fits(&test) {
                 self.current = test;

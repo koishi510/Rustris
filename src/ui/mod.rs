@@ -55,6 +55,13 @@ impl DasState {
             last_event: now,
         }
     }
+
+    pub fn reset_timers(&mut self) {
+        let now = Instant::now();
+        self.last_event = now;
+        self.start = now;
+        self.last_arr_move = now;
+    }
 }
 
 pub(crate) fn play_menu_sfx(music: &Option<audio::MusicPlayer>, sfx: Sfx) {

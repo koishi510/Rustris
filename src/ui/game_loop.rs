@@ -263,10 +263,7 @@ pub fn run_game(
                             game.lock_delay = Some(Instant::now());
                         }
                         if let Some(d) = &mut inp.das {
-                            let now = Instant::now();
-                            d.last_event = now;
-                            d.start = now;
-                            d.last_arr_move = now;
+                            d.reset_timers();
                         }
                         continue;
                     }

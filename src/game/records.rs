@@ -71,7 +71,7 @@ impl Records {
                 list.truncate(10);
                 Some(pos)
             }
-            GameMode::Marathon | GameMode::Ultra | GameMode::Endless | GameMode::Versus => {
+            GameMode::Marathon | GameMode::Ultra | GameMode::Endless => {
                 let score = record.score;
                 let pos = list
                     .iter()
@@ -84,6 +84,7 @@ impl Records {
                 list.truncate(10);
                 Some(pos)
             }
+            GameMode::Versus => unreachable!(),
         }
     }
 }

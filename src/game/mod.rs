@@ -169,7 +169,7 @@ impl Game {
     }
 
     fn is_on_ground(&self) -> bool {
-        let mut test = self.current.clone();
+        let mut test = self.current;
         test.row += 1;
         !self.fits(&test)
     }
@@ -202,7 +202,7 @@ impl Game {
     }
 
     pub fn ghost_row(&self) -> i32 {
-        let mut ghost = self.current.clone();
+        let mut ghost = self.current;
         loop {
             ghost.row += 1;
             if !self.fits(&ghost) {

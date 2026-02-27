@@ -9,6 +9,28 @@ pub enum GameMode {
     Versus,
 }
 
+impl GameMode {
+    pub fn next(self) -> Self {
+        match self {
+            Self::Marathon => Self::Sprint,
+            Self::Sprint => Self::Ultra,
+            Self::Ultra => Self::Endless,
+            Self::Endless => Self::Versus,
+            Self::Versus => Self::Marathon,
+        }
+    }
+
+    pub fn prev(self) -> Self {
+        match self {
+            Self::Marathon => Self::Versus,
+            Self::Sprint => Self::Marathon,
+            Self::Ultra => Self::Sprint,
+            Self::Endless => Self::Ultra,
+            Self::Versus => Self::Endless,
+        }
+    }
+}
+
 pub const LINE_CLEAR_ANIM_DURATION: Duration = Duration::from_millis(300);
 pub const ARE_DELAY: Duration = Duration::from_millis(100);
 

@@ -123,7 +123,7 @@ pub const PIECE_COLORS: [Color; 7] = [
     Color::Blue,
 ];
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Piece {
     pub kind: usize,
     pub rotation: u8,
