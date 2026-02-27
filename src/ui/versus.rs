@@ -340,11 +340,12 @@ pub fn run_versus(
                 };
                 render::versus::draw_versus_forfeit(stdout, bgm_on, sfx_on, sel)?;
             } else {
+                let pending = garbage_queue.total_pending() + game.garbage_anim_remaining();
                 render::versus::draw_versus(
                     stdout,
                     &game,
                     &opponent_snapshot,
-                    garbage_queue.total_pending(),
+                    pending,
                 )?;
             }
 

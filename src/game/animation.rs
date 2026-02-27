@@ -93,6 +93,16 @@ impl Game {
         self.garbage_rise_anim.is_some()
     }
 
+    pub fn garbage_anim_remaining(&self) -> u32 {
+        match self.garbage_rise_anim.as_ref() {
+            Some(anim) => {
+                let total: u32 = anim.events.iter().map(|(l, _)| l).sum();
+                total.saturating_sub(anim.lines_applied)
+            }
+            None => 0,
+        }
+    }
+
     pub fn update_garbage_animation(&mut self) -> bool {
         let anim = match self.garbage_rise_anim.as_ref() {
             Some(a) => a,
