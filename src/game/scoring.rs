@@ -102,19 +102,9 @@ impl Game {
             let total = line_points + combo_points;
             self.score += total;
 
-            let mut temp_board = self.board;
-            let mut new_board = [[EMPTY; BOARD_WIDTH]; BOARD_HEIGHT];
-            let mut dest = BOARD_HEIGHT - 1;
-            for src in (0..BOARD_HEIGHT).rev() {
-                if full_rows.contains(&src) {
-                    continue;
-                }
-                new_board[dest] = temp_board[src];
-                dest = dest.saturating_sub(1);
-            }
-            temp_board = new_board;
-
-            let is_all_clear = temp_board.iter().all(|row| row.iter().all(|&c| c == EMPTY));
+            let is_all_clear = (0..BOARD_HEIGHT).all(|r| {
+                full_rows.contains(&r) || self.board[r].iter().all(|&c| c == EMPTY)
+            });
             let pc_bonus = if is_all_clear {
                 let pc_base = match cleared {
                     1 => 800,

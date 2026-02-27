@@ -5,6 +5,19 @@ use crate::game::piece::*;
 use super::Game;
 
 impl Game {
+    fn refresh_lock_delay(&mut self) {
+        if self.lock_delay.is_some() {
+            if self.is_on_ground() {
+                if self.move_reset.is_none_or(|limit| self.move_reset_count < limit) {
+                    self.lock_delay = Some(Instant::now());
+                    self.move_reset_count += 1;
+                }
+            } else {
+                self.lock_delay = None;
+            }
+        }
+    }
+
     pub fn move_piece(&mut self, dr: i32, dc: i32) -> bool {
         let mut moved = self.current.clone();
         moved.row += dr;
@@ -12,16 +25,7 @@ impl Game {
         if self.fits(&moved) {
             self.current = moved;
             self.last_move = super::LastMove::Move;
-            if self.lock_delay.is_some() {
-                if self.is_on_ground() {
-                    if self.move_reset.is_none_or(|limit| self.move_reset_count < limit) {
-                        self.lock_delay = Some(Instant::now());
-                        self.move_reset_count += 1;
-                    }
-                } else {
-                    self.lock_delay = None;
-                }
-            }
+            self.refresh_lock_delay();
             true
         } else {
             false
@@ -52,16 +56,7 @@ impl Game {
                 if self.fits(&test) {
                     self.current = test;
                     self.last_move = super::LastMove::Rotate;
-                    if self.lock_delay.is_some() {
-                        if self.is_on_ground() {
-                            if self.move_reset.is_none_or(|limit| self.move_reset_count < limit) {
-                                self.lock_delay = Some(Instant::now());
-                                self.move_reset_count += 1;
-                            }
-                        } else {
-                            self.lock_delay = None;
-                        }
-                    }
+                    self.refresh_lock_delay();
                     return;
                 }
             }
@@ -71,16 +66,7 @@ impl Game {
             if self.fits(&test) {
                 self.current = test;
                 self.last_move = super::LastMove::Rotate;
-                if self.lock_delay.is_some() {
-                    if self.is_on_ground() {
-                        if self.move_reset.is_none_or(|limit| self.move_reset_count < limit) {
-                            self.lock_delay = Some(Instant::now());
-                            self.move_reset_count += 1;
-                        }
-                    } else {
-                        self.lock_delay = None;
-                    }
-                }
+                self.refresh_lock_delay();
             }
         }
     }
