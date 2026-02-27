@@ -247,15 +247,14 @@ const SECTION_C: &[(f32, f32, f32)] = &[
     (31.50, 0.50, 164.81),
 ];
 
-// [AB=0, C=1] pattern: AB AB C AB, repeated 4 times
-const PATTERN: &[usize] = &[0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0];
+// One cycle: AB AB C AB = 128 beats, looped by the player
+const CYCLE: &[&[(f32, f32, f32)]] = &[SECTION_AB, SECTION_AB, SECTION_C, SECTION_AB];
 
 fn build_notes() -> Vec<(f32, f32, f32)> {
-    let sections: &[&[(f32, f32, f32)]] = &[SECTION_AB, SECTION_C];
-    let mut notes = Vec::with_capacity(2120);
-    for (i, &sec_idx) in PATTERN.iter().enumerate() {
+    let mut notes = Vec::with_capacity(530);
+    for (i, section) in CYCLE.iter().enumerate() {
         let offset = i as f32 * 32.0;
-        for &(t, dur, freq) in sections[sec_idx] {
+        for &(t, dur, freq) in *section {
             notes.push((t + offset, dur, freq));
         }
     }

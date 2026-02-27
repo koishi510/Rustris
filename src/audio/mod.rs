@@ -64,7 +64,7 @@ const SFX_AMPLITUDE: f32 = 0.35;
 
 include!("bgm_score.rs");
 
-const TOTAL_BEATS: f32 = 512.0;
+const TOTAL_BEATS: f32 = 128.0;
 
 struct SampleNote {
     start: u64,
