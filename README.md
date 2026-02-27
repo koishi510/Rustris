@@ -8,11 +8,6 @@
 
 A guideline-compliant terminal Tetris with LAN multiplayer support.
 
-<p align="center">
-  <img src="assets/demo_solo.gif" width="49%" alt="Solo gameplay">
-  <img src="assets/demo_pvp.gif" width="49%" alt="Versus gameplay">
-</p>
-
 ## Install
 
 ```sh
@@ -75,7 +70,7 @@ Clearing lines sends garbage to your opponent:
 
 Combo bonus (added on top): 0-1 combo = +0, 2-3 = +1, 4-5 = +2, 6-7 = +3, 8-10 = +4, 11+ = +5.
 
-Pending garbage is absorbed when you clear lines (cancel before send). Uncleared garbage is applied to your board on lock.
+Pending garbage is absorbed when you clear lines (cancel before send). Uncleared garbage is applied to your board on lock. A red bar between the two boards shows the amount of pending garbage.
 
 ### Versus Rules
 
