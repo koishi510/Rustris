@@ -406,14 +406,12 @@ pub fn run_versus(
                                 play_menu_sfx(music, Sfx::MenuMove);
                             }
                             KeyCode::Left | KeyCode::Right => match *sel {
-                                0 => toggle_bgm(music),
-                                1 => toggle_sfx(music),
+                                2 => toggle_bgm(music),
+                                3 => toggle_sfx(music),
                                 _ => {}
                             }
                             KeyCode::Enter => match *sel {
-                                0 => toggle_bgm(music),
-                                1 => toggle_sfx(music),
-                                2 => {
+                                0 => {
                                     if let Some(m) = music.as_ref() {
                                         m.play_sfx(Sfx::Resume);
                                     }
@@ -424,10 +422,12 @@ pub fn run_versus(
                                     }
                                     execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
                                 }
-                                3 => {
+                                1 => {
                                     game.game_over = true;
                                     forfeit_sel = None;
                                 }
+                                2 => toggle_bgm(music),
+                                3 => toggle_sfx(music),
                                 _ => {}
                             },
                             KeyCode::Esc => {

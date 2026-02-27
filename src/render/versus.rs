@@ -254,11 +254,11 @@ pub fn draw_versus_forfeit(
         None,
         Some(format!("{:^width$}", "FORFEIT?", width = inner_w)),
         None,
-        Some(settings_toggle("BGM", bgm_on, selected == 0, inner_w)),
-        Some(settings_toggle("SFX", sfx_on, selected == 1, inner_w)),
+        Some(menu_item("Continue", selected == 0, inner_w)),
+        Some(menu_item("Forfeit", selected == 1, inner_w)),
         None,
-        Some(menu_item("Continue", selected == 2, inner_w)),
-        Some(menu_item("Forfeit", selected == 3, inner_w)),
+        Some(settings_toggle("BGM", bgm_on, selected == 2, inner_w)),
+        Some(settings_toggle("SFX", sfx_on, selected == 3, inner_w)),
         None,
     ];
 

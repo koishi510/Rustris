@@ -123,10 +123,10 @@ Game Over (single-player)
 └── Menu              → Main Menu
 
 Forfeit (versus, Esc to open, non-blocking)
-├── BGM               ← Left/Right/Enter to toggle
-├── SFX               ← Left/Right/Enter to toggle
 ├── Continue          → Resume (Esc also resumes)
-└── Forfeit           → Lose and end match
+├── Forfeit           → Lose and end match
+├── BGM               ← Left/Right/Enter to toggle
+└── SFX               ← Left/Right/Enter to toggle
 
 Versus Result
 ├── Rematch           → Request rematch (waiting screen)
@@ -188,48 +188,48 @@ Versus Result
 
 ```
 src/
-  main.rs              Entry point, terminal init/cleanup
-  audio/
-    mod.rs             Audio constants, module exports
-    bgm.rs             BGM note/melody data, cycle assembly
-    sfx.rs             Sfx enum, note sequences per sound effect
-    synth.rs           Polyphonic synthesis (PolySource, SfxSource)
-    player.rs          MusicPlayer: BGM/SFX playback via rodio
-  game/
-    mod.rs             Game struct definition
-    board.rs           Construction, board queries, hold, ghost, timing
-    movement.rs        Piece movement, rotation (SRS), gravity, drop
-    scoring.rs         T-Spin detection, line clear, scoring
-    animation.rs       Line clear animation, ARE, garbage rise animation
-    types.rs           GameMode, LastMove, ClearAction, timing constants
-    piece.rs           Piece/Bag structs, SRS data (rotation states, kick tables)
-    settings.rs        Settings struct (shared by solo and versus)
-    records.rs         Leaderboard persistence (JSON via serde)
-    garbage.rs         Attack calculation, garbage queue, cancel logic
-    tests.rs           Unit tests (board, piece, garbage, scoring)
-  net/
-    mod.rs             Network module exports
-    protocol.rs        NetMessage enum, protocol version, BoardSnapshot, GarbageAttack
-    transport.rs       Connection: frame encoding/decoding, non-blocking TCP I/O, timeout/length guard
-    host.rs            LAN IP detection, TCP listener (non-blocking accept)
-    client.rs          TCP connect with timeout
-  render/
-    mod.rs             Render module exports
-    common.rs          Shared render utilities, title, piece preview
-    board.rs           Single-player board rendering
-    menus.rs           Menu/overlay rendering (pause, game over, settings, etc.)
-    versus.rs          Dual-board rendering, lobby/countdown/result screens
-  ui/
-    mod.rs             UI module exports
-    app.rs             Application loop, versus flow dispatch
-    input.rs           Key handling, DAS/ARR, gravity, lock delay, menu helpers
-    session.rs         Single-player game loop, pause, game over, records
-    versus.rs          Versus game loop, lobby, handshake, countdown, garbage, rematch
-    menus/
-      mod.rs           Menu module exports
-      modes.rs         Mode select screen, records viewer
-      settings.rs      Settings menu (in-game and full)
-      versus.rs        Versus Host/Join sub-menus with port/address input
+├── main.rs              Entry point, terminal init/cleanup
+├── audio/
+│   ├── mod.rs           Audio constants, module exports
+│   ├── bgm.rs           BGM note/melody data, cycle assembly
+│   ├── sfx.rs           Sfx enum, note sequences per sound effect
+│   ├── synth.rs         Polyphonic synthesis (PolySource, SfxSource)
+│   └── player.rs        MusicPlayer: BGM/SFX playback via rodio
+├── game/
+│   ├── mod.rs           Game struct definition
+│   ├── board.rs         Construction, board queries, hold, ghost, timing
+│   ├── movement.rs      Piece movement, rotation (SRS), gravity, drop
+│   ├── scoring.rs       T-Spin detection, line clear, scoring
+│   ├── animation.rs     Line clear animation, ARE, garbage rise animation
+│   ├── types.rs         GameMode, LastMove, ClearAction, timing constants
+│   ├── piece.rs         Piece/Bag structs, SRS data (rotation states, kick tables)
+│   ├── settings.rs      Settings struct (shared by solo and versus)
+│   ├── records.rs       Leaderboard persistence (JSON via serde)
+│   ├── garbage.rs       Attack calculation, garbage queue, cancel logic
+│   └── tests.rs         Unit tests (board, piece, garbage, scoring)
+├── net/
+│   ├── mod.rs           Network module exports
+│   ├── protocol.rs      NetMessage enum, protocol version, BoardSnapshot, GarbageAttack
+│   ├── transport.rs     Connection: frame encoding/decoding, non-blocking TCP I/O, timeout/length guard
+│   ├── host.rs          LAN IP detection, TCP listener (non-blocking accept)
+│   └── client.rs        TCP connect with timeout
+├── render/
+│   ├── mod.rs           Render module exports
+│   ├── common.rs        Shared render utilities, title, piece preview
+│   ├── board.rs         Single-player board rendering
+│   ├── menus.rs         Menu/overlay rendering (pause, game over, settings, etc.)
+│   └── versus.rs        Dual-board rendering, lobby/countdown/result screens
+└── ui/
+    ├── mod.rs           UI module exports
+    ├── app.rs           Application loop, versus flow dispatch
+    ├── input.rs         Key handling, DAS/ARR, gravity, lock delay, menu helpers
+    ├── session.rs       Single-player game loop, pause, game over, records
+    ├── versus.rs        Versus game loop, lobby, handshake, countdown, garbage, rematch
+    └── menus/
+        ├── mod.rs       Menu module exports
+        ├── modes.rs     Mode select screen, records viewer
+        ├── settings.rs  Settings menu (in-game and full)
+        └── versus.rs    Versus Host/Join sub-menus with port/address input
 ```
 
 ## Dependencies
