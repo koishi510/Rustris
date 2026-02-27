@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::game::piece::{BOARD_WIDTH, BUFFER_HEIGHT, VISIBLE_HEIGHT};
-use crate::game::settings::VersusSettings;
+use crate::game::settings::Settings;
 use crate::game::Game;
 
 pub const PROTOCOL_VERSION: u8 = 1;
@@ -63,7 +63,7 @@ pub enum MatchOutcome {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum NetMessage {
     Hello { version: u8 },
-    LobbySettings(VersusSettings),
+    LobbySettings(Settings),
     Ready,
     Countdown(u8),
     GameStart,

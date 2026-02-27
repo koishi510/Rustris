@@ -37,7 +37,7 @@ impl Game {
             return;
         }
 
-        if self.srs {
+        if self.srs_enabled {
             let from = self.current.rotation;
             let to = new_rotation;
             let kick_table = if self.current.kind == 0 {

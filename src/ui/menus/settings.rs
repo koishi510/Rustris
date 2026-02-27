@@ -86,7 +86,7 @@ fn adjust_setting(settings: &mut Settings, sel: usize, direction: i32, mode: Gam
     } else if sel == mc + 5 {
         settings.bag_randomizer = !settings.bag_randomizer;
     } else if sel == mc + 6 {
-        settings.srs = !settings.srs;
+        settings.srs_enabled = !settings.srs_enabled;
     } else if sel == mc + 7 {
         settings.hold_enabled = !settings.hold_enabled;
     }

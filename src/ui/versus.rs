@@ -10,7 +10,7 @@ use crate::net::transport::Connection;
 use crate::net::{BoardSnapshot, GarbageAttack, MatchOutcome, NetMessage, PROTOCOL_VERSION};
 use crate::game::piece::*;
 use crate::render;
-use crate::game::settings::VersusSettings;
+use crate::game::settings::Settings;
 
 use super::input::{self, InputState};
 use super::{menu_nav, play_menu_sfx, read_key};
@@ -18,7 +18,7 @@ use super::{menu_nav, play_menu_sfx, read_key};
 const BOARD_SYNC_INTERVAL: Duration = Duration::from_millis(66);
 
 pub enum LobbyResult {
-    Connected(Connection, VersusSettings),
+    Connected(Connection, Settings),
     Back,
     Menu,
 }
@@ -128,7 +128,7 @@ pub fn run_host_lobby(
                     }
                 }
 
-                let vs = VersusSettings::default();
+                let vs = Settings::default();
                 conn.send(&NetMessage::LobbySettings(vs))?;
 
                 let msg = conn.recv_blocking()?;
@@ -291,7 +291,7 @@ pub fn run_versus(
     stdout: &mut io::Stdout,
     music: &mut Option<audio::MusicPlayer>,
     conn: &mut Connection,
-    vs_settings: &VersusSettings,
+    vs_settings: &Settings,
     is_host: bool,
 ) -> io::Result<bool> {
     execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
@@ -301,7 +301,8 @@ pub fn run_versus(
             return Ok(false);
         }
 
-        let game_settings = vs_settings.to_settings();
+        let mut game_settings = *vs_settings;
+        game_settings.level_cap = Some(game_settings.level);
         let mut game = Game::new(GameMode::Versus, &game_settings);
         let mut garbage_queue = GarbageQueue::new();
         let mut opponent_snapshot: Option<BoardSnapshot> = None;

@@ -1,10 +1,63 @@
 use std::time::{Duration, Instant};
 
 use crate::game::piece::*;
+use crate::game::settings::Settings;
 
-use super::Game;
+use super::{Game, GameMode, LastMove};
 
 impl Game {
+    pub fn new(mode: GameMode, settings: &Settings) -> Self {
+        let start_level = match mode {
+            GameMode::Marathon | GameMode::Endless => settings.level,
+            GameMode::Sprint | GameMode::Ultra => 1,
+            GameMode::Versus => settings.level,
+        };
+        let mut bag = Bag::new(settings.bag_randomizer);
+        let current_kind = bag.next();
+        let mut next_queue = Vec::with_capacity(settings.next_count);
+        for _ in 0..settings.next_count {
+            next_queue.push(bag.next());
+        }
+        Self {
+            board: [[EMPTY; BOARD_WIDTH]; BOARD_HEIGHT],
+            current: Piece::new(current_kind),
+            next_queue,
+            hold: None,
+            hold_used: false,
+            bag,
+            score: 0,
+            lines: 0,
+            level: start_level,
+            start_level,
+            game_over: false,
+            last_move: LastMove::None,
+            combo: -1,
+            back_to_back: false,
+            last_action: None,
+            last_action_time: Instant::now(),
+            lock_delay: None,
+            line_clear_anim: None,
+            are_timer: None,
+            mode,
+            game_start: Instant::now(),
+            elapsed: Duration::ZERO,
+            cleared: false,
+            marathon_goal: settings.marathon_goal,
+            sprint_goal: settings.sprint_goal,
+            ultra_time: settings.ultra_time,
+            level_cap: settings.level_cap,
+            ghost_enabled: settings.ghost,
+            line_clear_anim_enabled: settings.line_clear_anim,
+            next_count: settings.next_count,
+            srs_enabled: settings.srs_enabled,
+            hold_enabled: settings.hold_enabled,
+            lock_delay_ms: settings.lock_delay_ms,
+            move_reset: settings.move_reset,
+            move_reset_count: 0,
+            garbage_rise_anim: None,
+        }
+    }
+
     pub(super) fn pop_next(&mut self) -> Piece {
         if self.next_queue.is_empty() {
             return Piece::new(self.bag.next());
@@ -59,7 +112,7 @@ impl Game {
     pub(super) fn spawn_next(&mut self) {
         self.current = self.pop_next();
         self.hold_used = false;
-        self.last_move = super::LastMove::None;
+        self.last_move = LastMove::None;
         self.lock_delay = None;
         self.move_reset_count = 0;
         if !self.fits(&self.current) {
@@ -96,7 +149,7 @@ impl Game {
                 }
             }
         }
-        self.last_move = super::LastMove::None;
+        self.last_move = LastMove::None;
         self.move_reset_count = 0;
     }
 
@@ -130,7 +183,7 @@ impl Game {
     }
 
     pub fn time_remaining(&self) -> Option<Duration> {
-        if self.mode == super::GameMode::Ultra {
+        if self.mode == GameMode::Ultra {
             Some(Duration::from_secs(self.ultra_time as u64).saturating_sub(self.elapsed))
         } else {
             None

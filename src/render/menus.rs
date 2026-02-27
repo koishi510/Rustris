@@ -246,7 +246,7 @@ pub fn draw_settings(
         content.push(Some(settings_toggle_dim("Ghost", settings.ghost, inner_w)));
         content.push(Some(settings_toggle_dim("Anim", settings.line_clear_anim, inner_w)));
         content.push(Some(settings_toggle_dim("Bag", settings.bag_randomizer, inner_w)));
-        content.push(Some(settings_toggle_dim("SRS", settings.srs, inner_w)));
+        content.push(Some(settings_toggle_dim("SRS", settings.srs_enabled, inner_w)));
         content.push(Some(settings_toggle_dim("Hold", settings.hold_enabled, inner_w)));
         content.push(None);
         content.push(Some(settings_toggle("BGM", bgm_on, selected == 0, inner_w)));
@@ -295,7 +295,7 @@ pub fn draw_settings(
         content.push(Some(settings_toggle("Ghost", settings.ghost, selected == mc + 3, inner_w)));
         content.push(Some(settings_toggle("Anim", settings.line_clear_anim, selected == mc + 4, inner_w)));
         content.push(Some(settings_toggle("Bag", settings.bag_randomizer, selected == mc + 5, inner_w)));
-        content.push(Some(settings_toggle("SRS", settings.srs, selected == mc + 6, inner_w)));
+        content.push(Some(settings_toggle("SRS", settings.srs_enabled, selected == mc + 6, inner_w)));
         content.push(Some(settings_toggle("Hold", settings.hold_enabled, selected == mc + 7, inner_w)));
         content.push(None);
         content.push(Some(settings_toggle("BGM", bgm_on, selected == mc + 8, inner_w)));
