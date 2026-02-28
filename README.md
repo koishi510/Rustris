@@ -24,6 +24,20 @@ cargo run --release
 
 > Requires Rust 2024 edition (1.85+). On Linux, `libasound2-dev` (or equivalent) is needed for audio support.
 
+## Recommended Terminal Settings
+
+The game renders blocks as `██` (two full-block characters). For correct appearance, the terminal should use:
+
+- **Font**: Monospace with full Unicode support (JetBrains Mono, Cascadia Code, Fira Code, etc.)
+- **Line height**: 1.0 (extra line spacing causes horizontal gaps between blocks)
+- **Letter spacing**: 0 (extra spacing breaks block and border alignment)
+
+| Terminal | Where to check |
+| -------- | -------------- |
+| Kitty | `modify_font cell_height 0px` |
+| Windows Terminal | Settings > Profile > Appearance |
+| iTerm2 | Profiles > Text > Character/Line spacing: 100% |
+
 ## Game Modes
 
 <p align="center">
