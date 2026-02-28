@@ -85,11 +85,13 @@ pub fn run_host_lobby(
         Some(ip) => vec![format!("IP: {}", ip), format!("Port: {}", port)],
         None => vec![format!("Port: {}", port)],
     };
+    let fw_hint = format!("FW: TCP {}", port);
 
     let mut sel: usize = 0;
     loop {
         let lines: Vec<&str> = std::iter::once("Listening...")
             .chain(addr_lines.iter().map(|s| s.as_str()))
+            .chain(std::iter::once(fw_hint.as_str()))
             .collect();
         render::versus::draw_lobby_screen(
             stdout, "HOST GAME", &lines, "", &["Back", "Menu"], sel,

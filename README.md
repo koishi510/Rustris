@@ -184,6 +184,44 @@ Versus Result
 | BGM       | All               | ON / OFF           | ON      | Background music                     |
 | SFX       | All               | ON / OFF           | ON      | Sound effects                        |
 
+### Troubleshooting
+
+If the client gets `TimedOut` when joining, the host's firewall is likely blocking incoming TCP connections.
+
+**Linux**
+
+```sh
+# firewalld
+sudo firewall-cmd --add-port=21711/tcp
+# ufw
+sudo ufw allow 21711/tcp
+# iptables
+sudo iptables -I INPUT -p tcp --dport 21711 -j ACCEPT
+```
+
+**Windows**
+
+Windows Firewall usually prompts automatically when hosting. If not:
+
+```powershell
+netsh advfirewall firewall add rule name="Rustris" dir=in action=allow protocol=tcp localport=21711
+```
+
+Or go to **Windows Defender Firewall > Advanced Settings > Inbound Rules > New Rule**, select **Port**, enter `TCP` / `21711`, and allow the connection.
+
+**macOS**
+
+macOS usually prompts automatically when hosting. If not:
+
+```sh
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add "$(which rustris)"
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp "$(which rustris)"
+```
+
+Or go to **System Settings > Network > Firewall > Options**, click **+**, and add Rustris to the allowed list.
+
+Replace `21711` with the actual port if you changed it.
+
 ## Project Structure
 
 ```
